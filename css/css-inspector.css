@@ -1,0 +1,274 @@
+/* CSS inspector additions: Flex guidance, responsive scope and rich values */
+
+.flex-status-indicator {
+  margin-right: auto;
+  padding-left: 8px;
+  color: var(--accent-orange);
+  font: 700 9px/1 monospace;
+}
+
+.css-scope-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 9px;
+  padding: 7px 8px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.08);
+  color: #93c5fd;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.css-scope-guide i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.css-scope-guide code,
+.responsive-editing-status code {
+  direction: ltr;
+  display: inline-block;
+  color: var(--text-main);
+  font-family: monospace;
+}
+
+.css-scope-guide.item-guide {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+}
+
+.css-scope-guide.neutral-guide {
+  border-color: var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.css-scope-guide.responsive-guide {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+  color: #6ee7b7;
+}
+
+.display-segments {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.flex-only-section,
+.flex-container-controls,
+.flex-item-controls,
+.css-dimension-controls,
+.background-image-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wide-segments,
+.wrap-segments,
+.breakpoint-segments,
+.position-segments {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.wide-segments .segment-btn,
+.wrap-segments .segment-btn,
+.breakpoint-segments .segment-btn,
+.position-segments .segment-btn,
+.display-segments .segment-btn {
+  flex: 1 1 auto;
+  min-width: 45px;
+  padding: 0 5px;
+  font-size: 8.5px;
+}
+
+.breakpoint-segments .segment-btn {
+  min-height: 30px;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.css-prop-row-stacked {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.range-with-value {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+}
+
+.flex-item-divider {
+  height: 1px;
+  margin: 12px -8px 10px;
+  background: var(--border-color);
+}
+
+.flex-item-context-status {
+  padding: 6px 8px;
+  border: 1px dashed rgba(239, 68, 68, 0.45);
+  border-radius: var(--radius-sm);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.07);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.flex-item-context-status.valid {
+  border-color: rgba(16, 185, 129, 0.42);
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.flex-item-controls.is-disabled-context {
+  opacity: 0.48;
+}
+
+.compact-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 8px;
+}
+
+.compact-field-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compact-field-grid label,
+.css-inline-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-muted);
+  font: 9px/1.2 monospace;
+}
+
+.compact-field-grid .css-prop-field,
+.css-inline-field .css-prop-field {
+  width: min(88px, 62%);
+  height: 24px;
+  padding: 0 5px;
+  direction: ltr;
+  text-align: left;
+  font-family: monospace;
+  font-size: 9px;
+}
+
+.compact-field-grid-3 .css-prop-field {
+  width: 100%;
+}
+
+.compact-field-grid-3 label {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.css-inline-field-stacked {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.css-inline-field-stacked .css-prop-field {
+  width: 100%;
+}
+
+.background-image-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
+.background-image-actions .btn {
+  height: 27px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+
+.responsive-editing-status {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.responsive-editing-status[data-scope]:not([data-scope="base"]) {
+  border-color: var(--accent-green);
+  color: #6ee7b7;
+  box-shadow: inset 3px 0 0 var(--accent-green);
+}
+
+.css-value-invalid {
+  border-color: var(--accent-red) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+/* Hover now previews affordance only; it cannot be mistaken for selection. */
+.segment-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: var(--text-main) !important;
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+.segment-btn.active,
+.segment-btn[aria-pressed="true"] {
+  background: var(--accent-orange) !important;
+  color: var(--text-dark) !important;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25), var(--shadow-sm);
+}
+
+[data-css-help] {
+  cursor: help;
+}
+
+.css-prop-label[data-css-help]::after {
+  content: " ?";
+  color: var(--accent-blue);
+  font: 700 9px/1 monospace;
+}
+
+.css-guidance-tooltip {
+  position: fixed;
+  z-index: 20000;
+  width: min(280px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border: 1px solid var(--accent-blue);
+  border-radius: var(--radius-md);
+  background: #111827;
+  color: #e5e7eb;
+  box-shadow: var(--shadow-lg);
+  direction: rtl;
+  text-align: right;
+  font-size: 10px;
+  line-height: 1.55;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.css-guidance-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 1200px) {
+  .compact-field-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
