@@ -27,6 +27,7 @@ class DOMTreeManager {
 
     this.autoScrollDirection = 0;
     this.autoScrollTimer = null;
+    this.paletteDraggedTag = '';
 
     this.setupAccessibility();
     this.setupEventDelegation();
@@ -378,20 +379,13 @@ class DOMTreeManager {
   deleteElement(element) {
     if (!this.canvas || !this.canvas.contains(element)) return;
 
-    const selected = this.app.selectedElement;
-    const nextSelection = selected && (selected === element || element.contains(selected))
-      ? null
-      : selected;
-
     if (this.hoveredElement && (this.hoveredElement === element || element.contains(this.hoveredElement))) {
       this.cleanupHoveredElement();
     }
 
-    /* نفس تنظيف مساري الحذف في app.js — قبل الإزالة وقبل لقطة الـ history. */
-    if (this.app.styleEngine) this.app.styleEngine.removeSelectorDeep(element);
-    element.remove();
-    this.commitStructureChange(nextSelection, 'Delete DOM node');
-    this.announce('تم حذف العنصر من شجرة الصفحة');
+    if (typeof this.app.deleteCanvasElement === 'function' && this.app.deleteCanvasElement(element, 'Delete DOM node')) {
+      this.announce('تم حذف العنصر من شجرة الصفحة مع تنظيف تنسيقه وتفاعلاته');
+    }
   }
 
   handleTreeMouseOver(event) {
@@ -463,11 +457,44 @@ class DOMTreeManager {
   }
 
   /* ── إفلات عنصر جديد من لوحة العناصر على الشجرة مباشرة ── */
-  getPaletteDragTag() {
-    return this.app && this.app.dragDrop && this.app.dragDrop.draggedTag ? this.app.dragDrop.draggedTag : '';
+  getPaletteDragTag(event = null) {
+    if (this.paletteDraggedTag) return this.paletteDraggedTag;
+    const manager = this.app && this.app.dragDrop;
+    if (!manager) return '';
+    if (typeof manager.getDraggedPaletteTag === 'function') {
+      return manager.getDraggedPaletteTag(event && event.dataTransfer);
+    }
+    return manager.draggedTag || '';
+  }
+
+  beginPaletteDrag(tag) {
+    if (!tag || !this.rootContainer) return;
+    this.paletteDraggedTag = tag;
+    this.rootContainer.classList.add('dom-tree-drag-session', 'dom-tree-palette-drag-session');
+    this.rootContainer.setAttribute('aria-dropeffect', 'copy');
+    if (this.rootDropZone) this.rootDropZone.setAttribute('aria-hidden', 'false');
+  }
+
+  endPaletteDrag() {
+    this.paletteDraggedTag = '';
+    if (this.rootContainer) {
+      this.rootContainer.classList.remove('dom-tree-palette-drag-session');
+      if (!this.draggedElement) {
+        this.rootContainer.classList.remove('dom-tree-drag-session');
+        this.rootContainer.removeAttribute('aria-dropeffect');
+      }
+    }
+    if (this.rootDropZone && !this.draggedElement) this.rootDropZone.setAttribute('aria-hidden', 'true');
+    this.clearDropFeedback(true);
+    this.stopAutoScroll();
   }
 
   isPaletteDropAllowed(tag, target, position) {
+    const manager = this.app && this.app.dragDrop;
+    if (manager && typeof manager.isInsertionAllowed === 'function') {
+      return manager.isInsertionAllowed(tag, target, position);
+    }
+
     const info = typeof getElementInfo === 'function' ? getElementInfo(tag) : null;
     const container = position === 'inside' ? target : (target === this.canvas ? this.canvas : target.parentElement);
     if (!container) return false;
@@ -482,8 +509,9 @@ class DOMTreeManager {
   }
 
   handlePaletteDragOver(event) {
-    const tag = this.getPaletteDragTag();
+    const tag = this.getPaletteDragTag(event);
     if (!tag) return;
+    if (!this.paletteDraggedTag) this.beginPaletteDrag(tag);
     event.preventDefault();
     event.stopPropagation();
     this.updateAutoScroll(event.clientY);
@@ -510,7 +538,7 @@ class DOMTreeManager {
   }
 
   handlePaletteDrop(event) {
-    const tag = this.getPaletteDragTag();
+    const tag = this.getPaletteDragTag(event);
     if (!tag) return;
     event.preventDefault();
     event.stopPropagation();
@@ -525,24 +553,37 @@ class DOMTreeManager {
       const wrapper = this.closestWithinRoot(event.target, '.dom-tree-node-wrapper');
       if (wrapper) {
         target = wrapper[this.elementRefKey];
-        position = this.getDropPosition(wrapper, target, event.clientY);
+        position = this.currentDropTarget === target && this.currentDropPosition
+          ? this.currentDropPosition
+          : this.getDropPosition(wrapper, target, event.clientY);
       }
     }
     this.clearDropFeedback();
     this.stopAutoScroll();
-    if (!target || !position) return;
+    if (!target || !position) {
+      this.endPaletteDrag();
+      return;
+    }
 
     /* validateConstraints تعرض رسالة تحذير عربية توضح المكان الصحيح عند الرفض */
-    if (!this.app.dragDrop.validateConstraints(tag, target, position)) return;
+    if (!this.app.dragDrop.validateConstraints(tag, target, position)) {
+      this.endPaletteDrag();
+      return;
+    }
 
     if (tag === 'input') {
       this.app.dragDrop.pendingDropTarget = target;
       this.app.dragDrop.pendingDropPosition = position;
+      this.app.dragDrop.pendingDropAnnouncement = true;
+      if (position === 'inside' && target !== this.canvas) this.collapsedElements.delete(target);
       this.app.dragDrop.openInputTypeModal();
+      this.endPaletteDrag();
       return;
     }
     if (position === 'inside' && target !== this.canvas) this.collapsedElements.delete(target);
-    this.app.dragDrop.insertElement(tag, target, position);
+    const inserted = this.app.dragDrop.insertElement(tag, target, position);
+    this.endPaletteDrag();
+    if (!inserted) return;
     this.announce(`تمت إضافة ${tag} ${position === 'inside' ? 'داخل' : 'بجوار'} ${this.getElementLabel(target)}`);
   }
 
@@ -581,7 +622,7 @@ class DOMTreeManager {
   }
 
   handleDragLeave(event) {
-    if (!this.draggedElement && !this.getPaletteDragTag()) return;
+    if (!this.draggedElement && !this.getPaletteDragTag(event)) return;
     const relatedTarget = event.relatedTarget;
     if (relatedTarget && this.rootContainer.contains(relatedTarget)) return;
 
