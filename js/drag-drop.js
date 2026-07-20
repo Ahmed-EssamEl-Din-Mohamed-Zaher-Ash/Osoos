@@ -14,6 +14,8 @@ class DragDropManager {
     
     this.pendingDropTarget = null; // Used for deferred drops (like input types)
     this.pendingDropPosition = null;
+    this.pendingDropAnnouncement = false;
+    this.paletteMime = 'application/x-osoos-element-tag';
     
     this.init();
   }
@@ -27,6 +29,7 @@ class DragDropManager {
     // Close modal
     document.getElementById('close-modal-btn').addEventListener('click', () => {
       this.inputTypeModal.classList.remove('open');
+      this.clearPendingInputDrop();
     });
     
     this.setupInputTypeOptions();
@@ -34,21 +37,183 @@ class DragDropManager {
 
   // Set up the draggable items in the elements list
   makeDraggable(elementCard) {
+    let suppressClickAfterDrag = false;
+    let suppressionTimer = null;
+
+    const startClickSuppression = (delay = 700) => {
+      suppressClickAfterDrag = true;
+      clearTimeout(suppressionTimer);
+      suppressionTimer = setTimeout(() => {
+        suppressClickAfterDrag = false;
+      }, delay);
+    };
+
     elementCard.setAttribute('draggable', 'true');
     elementCard.addEventListener('dragstart', (e) => {
+      startClickSuppression();
       this.draggedTag = elementCard.dataset.tag;
-      e.dataTransfer.setData('text/plain', this.draggedTag);
-      e.dataTransfer.effectAllowed = 'copy';
+      if (e.dataTransfer) {
+        // The custom marker prevents DOM-tree node moves from being mistaken
+        // for new elements while text/plain keeps native browser compatibility.
+        e.dataTransfer.setData(this.paletteMime, this.draggedTag);
+        e.dataTransfer.setData('text/plain', this.draggedTag);
+        e.dataTransfer.effectAllowed = 'copy';
+      }
+      if (this.app.domTree && typeof this.app.domTree.beginPaletteDrag === 'function') {
+        this.app.domTree.beginPaletteDrag(this.draggedTag);
+      }
       
       // Visual feedback of drag
       elementCard.style.opacity = '0.5';
     });
 
     elementCard.addEventListener('dragend', () => {
+      // Browsers may emit a click immediately after dragend. Keep a short
+      // suppression window so that drop + click never creates two elements.
+      startClickSuppression(300);
       elementCard.style.opacity = '1';
       this.hideIndicator();
+      if (this.app.domTree && typeof this.app.domTree.endPaletteDrag === 'function') {
+        this.app.domTree.endPaletteDrag();
+      }
       this.draggedTag = null;
     });
+
+    elementCard.addEventListener('click', (e) => {
+      if (suppressClickAfterDrag) {
+        e.preventDefault();
+        e.stopPropagation();
+        suppressClickAfterDrag = false;
+        clearTimeout(suppressionTimer);
+        return;
+      }
+      this.activateElementCard(elementCard);
+    });
+
+    elementCard.addEventListener('keydown', (e) => {
+      if (e.repeat || !['Enter', ' ', 'Spacebar'].includes(e.key)) return;
+      e.preventDefault();
+      this.activateElementCard(elementCard);
+    });
+  }
+
+  getDraggedPaletteTag(dataTransfer = null) {
+    let tag = this.draggedTag || '';
+    if (!tag && dataTransfer && typeof dataTransfer.getData === 'function') {
+      try {
+        tag = dataTransfer.getData(this.paletteMime) || '';
+      } catch (error) {
+        tag = '';
+      }
+    }
+
+    if (!tag) return '';
+    if (typeof HTML_ELEMENTS_DB !== 'undefined' && Array.isArray(HTML_ELEMENTS_DB)) {
+      return HTML_ELEMENTS_DB.some(item => item && item.tag === tag) ? tag : '';
+    }
+    return (/^[a-z][a-z0-9-]*$/i.test(tag) || tag === '@font-face') ? tag : '';
+  }
+
+  // Add a palette item without requiring pointer drag-and-drop.
+  activateElementCard(elementCard) {
+    const tag = elementCard && elementCard.dataset ? elementCard.dataset.tag : '';
+    if (!tag) return false;
+
+    const insertionPoint = this.getPreferredInsertionPoint(tag);
+    if (!insertionPoint) {
+      const info = getElementInfo(tag);
+      this.showWarning(
+        info ? info.labelAr : tag,
+        'اختر أولاً حاوية مناسبة لهذا العنصر داخل مساحة البناء.'
+      );
+      return false;
+    }
+
+    const { target, position } = insertionPoint;
+    if (tag === 'input') {
+      this.pendingDropTarget = target;
+      this.pendingDropPosition = position;
+      this.pendingDropAnnouncement = true;
+      this.openInputTypeModal();
+      return true;
+    }
+
+    const inserted = this.insertElement(tag, target, position);
+    if (inserted) this.announceInsertion(tag, target, position);
+    return Boolean(inserted);
+  }
+
+  getPreferredInsertionPoint(tag) {
+    const selected = this.app && this.app.selectedElement;
+    const hasSelected = selected && selected !== this.canvas && this.canvas.contains(selected);
+    const candidates = [];
+
+    if (hasSelected) {
+      candidates.push({ target: selected, position: 'inside' });
+      candidates.push({ target: selected, position: 'after' });
+    }
+    candidates.push({ target: this.canvas, position: 'inside' });
+
+    return candidates.find(point => this.isInsertionAllowed(tag, point.target, point.position)) || null;
+  }
+
+  // Side-effect-free constraint check used while choosing a click/keyboard target.
+  // validateConstraints remains responsible for visible warnings during dragging.
+  isInsertionAllowed(tag, target, position) {
+    if (!target || (target !== this.canvas && !this.canvas.contains(target))) return false;
+
+    const info = getElementInfo(tag);
+    let container = target;
+    if (position !== 'inside') container = target.parentElement;
+    if (!container || (container !== this.canvas && !this.canvas.contains(container))) return false;
+
+    const domTree = this.app && this.app.domTree;
+    if (position === 'inside') {
+      if (domTree && typeof domTree.canContainChildren === 'function') {
+        if (!domTree.canContainChildren(target)) return false;
+      } else if (target !== this.canvas) {
+        const targetInfo = getElementInfo(target.tagName.toLowerCase());
+        if (targetInfo && targetInfo.type === 'void') return false;
+      }
+    }
+
+    if (info && Array.isArray(info.allowedParents)) {
+      if (container === this.canvas) {
+        if (info.type === 'restricted' && !info.allowedParents.includes('builder-canvas')) return false;
+      } else if (!info.allowedParents.includes(container.tagName.toLowerCase())) {
+        return false;
+      }
+    }
+
+    if (domTree && typeof domTree.checkContainerAcceptsChildTag === 'function') {
+      const rule = domTree.checkContainerAcceptsChildTag(container, tag);
+      if (!rule.allowed) return false;
+    }
+
+    return true;
+  }
+
+  announceInsertion(tag, target, position) {
+    if (!this.app || typeof this.app.showToastNotice !== 'function') return;
+    const info = getElementInfo(tag);
+    const elementName = info ? info.labelAr : tag;
+    let location = 'في مساحة البناء';
+
+    if (target !== this.canvas) {
+      const targetInfo = getElementInfo(target.tagName.toLowerCase());
+      const targetName = targetInfo ? targetInfo.labelAr : target.tagName.toLowerCase();
+      if (position === 'inside') location = `داخل ${targetName}`;
+      else if (position === 'after') location = `بعد ${targetName}`;
+      else location = `قبل ${targetName}`;
+    }
+
+    this.app.showToastNotice(`تمت إضافة ${elementName} ${location}.`);
+  }
+
+  clearPendingInputDrop() {
+    this.pendingDropTarget = null;
+    this.pendingDropPosition = null;
+    this.pendingDropAnnouncement = false;
   }
 
   handleDragOver(e) {
@@ -272,7 +437,7 @@ class DragDropManager {
       }
       const fontArea = document.getElementById('custom-font-area');
       if (fontArea) { fontArea.open = true; fontArea.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-      return;
+      return null;
     }
     const newEl = document.createElement(tag);
     
@@ -292,6 +457,7 @@ class DragDropManager {
     this.app.selectElement(newEl);
     this.app.syncAll();
     this.app.history.saveState('Add Element');
+    return newEl;
   }
 
   applyElementDefaults(el, tag, attributes) {
@@ -401,9 +567,12 @@ class DragDropManager {
       btn.addEventListener('click', () => {
         this.inputTypeModal.classList.remove('open');
         if (this.pendingDropTarget) {
-          this.insertElement('input', this.pendingDropTarget, this.pendingDropPosition, { type: t });
-          this.pendingDropTarget = null;
-          this.pendingDropPosition = null;
+          const target = this.pendingDropTarget;
+          const position = this.pendingDropPosition;
+          const shouldAnnounce = this.pendingDropAnnouncement;
+          const inserted = this.insertElement('input', target, position, { type: t });
+          if (inserted && shouldAnnounce) this.announceInsertion('input', target, position);
+          this.clearPendingInputDrop();
         }
       });
       this.inputTypesContainer.appendChild(btn);
