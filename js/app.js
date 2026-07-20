@@ -66,6 +66,14 @@ class HistoryManager {
       this.debounceTimeout = null;
     }, delay);
   }
+
+  flushPendingState(reason = 'Flush Pending State') {
+    if (!this.debounceTimeout) return false;
+    clearTimeout(this.debounceTimeout);
+    this.debounceTimeout = null;
+    this.saveState(reason);
+    return true;
+  }
   
   undo() {
     if (this.debounceTimeout) {
@@ -182,7 +190,11 @@ class HistoryManager {
     } else {
       this.app.highlighter.style.display = 'none';
     }
-    this.app.editor.updateInteractiveLinker();
+    if (typeof this.app.refreshInteractionUIAfterStructureCleanup === 'function') {
+      this.app.refreshInteractionUIAfterStructureCleanup();
+    } else {
+      this.app.editor.updateInteractiveLinker();
+    }
     
     // Save progress
     this.app.saveProgress();
@@ -327,6 +339,9 @@ class WebBuilderApp {
           card.className = 'element-card';
           card.dataset.tag = el.tag;
           card.title = el.desc;
+          card.setAttribute('role', 'button');
+          card.tabIndex = 0;
+          card.setAttribute('aria-label', `إضافة ${el.labelAr} (${el.tag}) إلى الصفحة`);
           
           card.innerHTML = `
             <span class="element-dot ${el.type}"></span>
@@ -502,15 +517,9 @@ class WebBuilderApp {
           active.closest('.editor-area')
         );
         if (isEditable) return;
-        
-        /* تنظيف قواعد الـ CSS قبل الإزالة وقبل لقطة الـ history:
-           من غير كده قواعد العنصر المحذوف بتفضل في التصدير للأبد.
-           التراجع سليم: اللقطة السابقة لسه فيها الـ CSS القديم. */
-        if (this.styleEngine) this.styleEngine.removeSelectorDeep(this.selectedElement);
-        this.selectedElement.remove();
-        this.selectElement(null);
-        this.syncAll();
-        this.history.saveState('Delete Element');
+
+        e.preventDefault();
+        this.deleteCanvasElement(this.selectedElement, 'Delete Element');
         return;
       }
 
@@ -811,12 +820,7 @@ class WebBuilderApp {
       btnDelete.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!this.selectedElement) return;
-        /* نفس تنظيف مسار زر Delete بالكيبورد. */
-        if (this.styleEngine) this.styleEngine.removeSelectorDeep(this.selectedElement);
-        this.selectedElement.remove();
-        this.selectElement(null);
-        this.syncAll();
-        this.history.saveState('Delete Element');
+        this.deleteCanvasElement(this.selectedElement, 'Delete Element');
       });
     }
 
@@ -1066,6 +1070,137 @@ class WebBuilderApp {
     this.customStyleTag.textContent = unmanagedCss;
     // Recalculate highlighter sizes in case styling changes dimensions
     setTimeout(() => this.updateHighlighter(), 100);
+  }
+
+  /* Build the identity diff before an HTML branch disappears. This snapshot is
+     shared by CSS and JavaScript cleanup so all deletion entry points produce
+     exactly the same result. */
+  createStructureRemovalContext(elements, options = {}) {
+    const roots = Array.from(elements || [])
+      .filter(element => element && element.nodeType === 1 && this.canvas && this.canvas.contains(element))
+      .filter((element, index, all) => !all.some((other, otherIndex) => otherIndex !== index && other.contains(element)));
+    const replacementRoot = options.replacementRoot || null;
+    const nodes = [];
+    roots.forEach(root => nodes.push(root, ...root.querySelectorAll('*')));
+    const nodeSet = new Set(nodes);
+    const isRemovedNode = node => nodeSet.has(node) || roots.some(root => root.contains(node));
+    const editorClasses = new Set([
+      'selected-element', 'hovered-canvas-element', 'drag-hover-container',
+      'canvas-picker-target', 'move-mode-active', 'shake-reject',
+      'dom-tree-hover-preview'
+    ]);
+
+    const replacementElements = replacementRoot && typeof replacementRoot.querySelectorAll === 'function'
+      ? Array.from(replacementRoot.querySelectorAll('*'))
+      : [];
+    const remainingCanvasElements = !replacementRoot && this.canvas
+      ? Array.from(this.canvas.querySelectorAll('*')).filter(node => !isRemovedNode(node))
+      : [];
+    const remainingElements = replacementRoot ? replacementElements : remainingCanvasElements;
+
+    const candidateIds = new Set();
+    const candidateClasses = new Set();
+    nodes.forEach(node => {
+      if (node.id) candidateIds.add(node.id);
+      if (node.classList) node.classList.forEach(className => {
+        if (!editorClasses.has(className)) candidateClasses.add(className);
+      });
+    });
+
+    const remainingIds = new Set();
+    const remainingClasses = new Set();
+    remainingElements.forEach(node => {
+      if (node.id) remainingIds.add(node.id);
+      if (node.classList) node.classList.forEach(className => {
+        if (!editorClasses.has(className)) remainingClasses.add(className);
+      });
+    });
+
+    const deletedIds = new Set(Array.from(candidateIds).filter(id => !remainingIds.has(id)));
+    const deletedClasses = new Set(Array.from(candidateClasses).filter(className => !remainingClasses.has(className)));
+    const queryMatches = (root, selector) => {
+      if (!root || !selector) return [];
+      const matches = [];
+      try {
+        if (root.nodeType === 1 && root.matches && root.matches(selector)) matches.push(root);
+        if (typeof root.querySelectorAll === 'function') matches.push(...root.querySelectorAll(selector));
+      } catch (error) { return []; }
+      return matches;
+    };
+    const selectorIsOrphan = selector => {
+      const touchedRemovedBranch = roots.some(root => queryMatches(root, selector).length > 0);
+      if (!touchedRemovedBranch) return false;
+      if (replacementRoot) return queryMatches(replacementRoot, selector).length === 0;
+      return queryMatches(this.canvas, selector).every(node => isRemovedNode(node));
+    };
+
+    return {
+      roots,
+      nodes,
+      deletedIds,
+      deletedClasses,
+      selectorIsOrphan,
+      hasOrphanSelectors: roots.length > 0,
+      replacementRoot
+    };
+  }
+
+  cleanupStructureRemoval(elements, options = {}) {
+    const context = this.createStructureRemovalContext(elements, options);
+    const report = {
+      cssManaged: 0,
+      cssUnmanagedChanged: false,
+      js: { changed: false, visualLinks: 0, components: 0, interactions: 0, blocks: 0, variables: 0 }
+    };
+    if (!context.roots.length) return Object.assign(report, { context });
+
+    const identities = { ids: context.deletedIds, classes: context.deletedClasses };
+    if (this.styleEngine && this.editor) {
+      const currentCss = this.editor.customCSS || '';
+      const unmanagedCss = this.styleEngine.stripManagedBlock(currentCss);
+      const nextUnmanagedCss = this.styleEngine.removeUnmanagedRulesForIdentities(unmanagedCss, identities);
+      report.cssUnmanagedChanged = nextUnmanagedCss !== unmanagedCss;
+      report.cssManaged = this.styleEngine.removeRulesForIdentities(identities, false);
+      if (report.cssManaged || report.cssUnmanagedChanged) {
+        this.editor.customCSS = nextUnmanagedCss;
+        this.styleEngine.commitToEditor();
+      }
+    }
+
+    if (this.editor && typeof this.editor.cleanupReferencesForDeletedElements === 'function') {
+      report.js = this.editor.cleanupReferencesForDeletedElements({
+        deletedIds: context.deletedIds,
+        selectorIsOrphan: context.selectorIsOrphan,
+        hasOrphanSelectors: context.hasOrphanSelectors
+      });
+    }
+    return Object.assign(report, { context });
+  }
+
+  refreshInteractionUIAfterStructureCleanup() {
+    if (!this.editor) return;
+    ['scanAndRenderVariables', 'renderBlocksDashboard', 'renderGlobalInteractionsDashboard',
+      'renderComponentsManagementList', 'renderVisualLinksDashboard', 'updateInteractiveLinker',
+      'updateVisualLinkArrows'].forEach(method => {
+      if (typeof this.editor[method] === 'function') this.editor[method]();
+    });
+  }
+
+  deleteCanvasElement(element, reason = 'Delete Element') {
+    if (!element || !this.canvas || !this.canvas.contains(element) || element === this.canvas) return false;
+    const selected = this.selectedElement;
+    const nextSelection = selected && (selected === element || element.contains(selected)) ? null : selected;
+
+    if (this.history && typeof this.history.flushPendingState === 'function') {
+      this.history.flushPendingState('Flush pending state before delete');
+    }
+    this.cleanupStructureRemoval([element]);
+    element.remove();
+    this.selectElement(nextSelection);
+    this.syncAll();
+    this.refreshInteractionUIAfterStructureCleanup();
+    this.history.saveState(reason);
+    return true;
   }
 
   // Synchronization between UI Canvas, Code Editor, and DOM tree
@@ -2386,6 +2521,10 @@ ${projectCss}`;
       container.style.gap = '8px';
       document.body.appendChild(container);
     }
+
+    container.setAttribute('role', 'status');
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'true');
 
     container.innerHTML = '';
 
