@@ -311,10 +311,25 @@ console.log("تم تحميل الصفحة المصممة بنجاح!");`;
         const safeHtml = typeof this.app.sanitizeRestoredHtml === 'function'
           ? this.app.sanitizeRestoredHtml(doc.body.innerHTML)
           : doc.body.innerHTML;
+        const replacementTemplate = document.createElement('template');
+        replacementTemplate.innerHTML = safeHtml;
+        if (this.app.history && typeof this.app.history.flushPendingState === 'function') {
+          this.app.history.flushPendingState('Flush pending state before HTML edit');
+        }
+        if (typeof this.app.cleanupStructureRemoval === 'function') {
+          this.app.cleanupStructureRemoval(Array.from(canvas.children), {
+            replacementRoot: replacementTemplate.content
+          });
+        }
         canvas.innerHTML = safeHtml;
-        
+
+        this.app.selectElement(null);
         this.app.reattachCanvasListeners();
         this.app.syncDOMTree();
+        if (typeof this.app.refreshInteractionUIAfterStructureCleanup === 'function') {
+          this.app.refreshInteractionUIAfterStructureCleanup();
+        }
+        this.app.history.saveState('Edit HTML structure');
       } catch (err) {
         console.error('Error syncing editor to canvas:', err);
       }
@@ -3140,6 +3155,131 @@ getAllCanvasElements() {
     this.scanAndRenderVariables();
   }
 
+  /* Update generated and hand-written references when an element identity is
+     renamed. Only identifier-bearing contexts are touched; arbitrary strings
+     (for example a colour equal to "#abc") remain byte-for-byte unchanged. */
+  rewriteIdentityMetadata(value, options, key = '', parentKey = '', owner = null) {
+    const oldId = String(options.oldId || '');
+    const newId = String(options.newId || '');
+    const classRenames = Array.isArray(options.classRenames) ? options.classRenames : [];
+    const preserveOldClasses = new Set(options.preserveOldClasses || []);
+    const idKeys = new Set([
+      'sourceId', 'targetId', 'elementId', 'baseId', 'containerId', 'triggerId',
+      'contentId', 'tabId', 'panelId', 'tabListId', 'panelsContainerId',
+      'modalId', 'sidebarId', 'overlayId', 'openTriggerId', 'closeTriggerId'
+    ]);
+    const classKeys = new Set([
+      'className', 'activeClass', 'openClass', 'buttonClass', 'panelClass',
+      'itemClass', 'triggerClass', 'contentClass'
+    ]);
+
+    if (Array.isArray(value)) {
+      return value.map(item => this.rewriteIdentityMetadata(item, options, '', key, null));
+    }
+    if (value && typeof value === 'object') {
+      const next = {};
+      Object.keys(value).forEach(childKey => {
+        next[childKey] = this.rewriteIdentityMetadata(value[childKey], options, childKey, key, value);
+      });
+      return next;
+    }
+    if (typeof value !== 'string') return value;
+
+    const descriptorId = key === 'id' && owner && (
+      Object.prototype.hasOwnProperty.call(owner, 'selector') ||
+      /(?:descriptor|target|source|element)/i.test(parentKey)
+    );
+    if (oldId && newId && value === oldId && (idKeys.has(key) || descriptorId)) return newId;
+
+    if (/selector/i.test(key) && this.app.styleEngine) {
+      return this.app.styleEngine.rewriteSelectorReferences(value, options);
+    }
+    if (classKeys.has(key)) {
+      const rename = classRenames.find(item => item.oldClass === value);
+      if (rename && !preserveOldClasses.has(rename.oldClass)) return rename.newClass;
+    }
+    return value;
+  }
+
+  rewriteEncodedIdentityMetadata(code, options) {
+    const markerPattern = /(\/\/\s*(?:OSOOS_LOGIC_DATA|OSOOS_COMPONENT_DATA|BLOCK_PARAMS|PARAMS):\s*)([^\r\n]*)/g;
+    return String(code || '').replace(markerPattern, (whole, prefix, rawPayload) => {
+      const payload = rawPayload.trim();
+      if (!payload) return whole;
+      try {
+        const decoded = JSON.parse(decodeURIComponent(payload));
+        const rewritten = this.rewriteIdentityMetadata(decoded, options);
+        return `${prefix}${encodeURIComponent(JSON.stringify(rewritten))}`;
+      } catch (error) {
+        return whole;
+      }
+    });
+  }
+
+  rewriteSelectorCallsInJS(code, options) {
+    if (!this.app.styleEngine) return code;
+    /* Generated selectors are single-line literals. Keeping this deliberately
+       narrow prevents edits inside template bodies or unrelated prose. */
+    const selectorCall = /(\b(?:querySelector(?:All)?|closest|matches)\(\s*)(['"`])([^'"`\r\n]*)(\2)/g;
+    return String(code || '').replace(selectorCall, (whole, prefix, quote, selector, closingQuote) => {
+      const rewritten = this.app.styleEngine.rewriteSelectorReferences(selector, options);
+      return `${prefix}${quote}${rewritten}${closingQuote}`;
+    });
+  }
+
+  renameElementReferences(options = {}) {
+    const oldId = String(options.oldId || '');
+    const newId = String(options.newId || '');
+    const classRenames = Array.isArray(options.classRenames) ? options.classRenames : [];
+    if ((!oldId || !newId || oldId === newId) && !classRenames.length) return 0;
+
+    const before = String(this.customJS || '');
+    let code = this.rewriteEncodedIdentityMetadata(before, options);
+    const escape = value => this.regexEscape(value);
+
+    if (oldId && newId && oldId !== newId) {
+      /* Structured block headers feed every dashboard/parser. */
+      const headerPattern = new RegExp(`^(\\s*//\\s*(?:SOURCE_ID|TARGET_ID):\\s*)${escape(oldId)}(\\s*)$`, 'gm');
+      code = code.replace(headerPattern, `$1${newId}$2`);
+
+      /* Both generated code and normal user code commonly use this API. */
+      const getByIdPattern = new RegExp(`(\\bgetElementById\\(\\s*)(['"\u0060])${escape(oldId)}\\2(\\s*\\))`, 'g');
+      code = code.replace(getByIdPattern, (whole, prefix, quote, suffix) => `${prefix}${quote}${newId}${quote}${suffix}`);
+
+      /* JSON descriptors embedded in generated executable component code. */
+      const jsonIdPattern = new RegExp(`("(?:sourceId|targetId|elementId|baseId|containerId|triggerId|contentId|tabId|panelId|tabListId|panelsContainerId|modalId|sidebarId|overlayId|id)"\\s*:\\s*")${escape(oldId)}(")`, 'g');
+      code = code.replace(jsonIdPattern, `$1${newId}$2`);
+    }
+
+    code = this.rewriteSelectorCallsInJS(code, options);
+
+    /* classList references are safe to rename only when the old class stopped
+       being used elsewhere. Shared identity classes may also be interaction
+       state classes, so changing them globally would alter other elements. */
+    const preserved = new Set(options.preserveOldClasses || []);
+    classRenames.forEach(rename => {
+      if (!rename.oldClass || !rename.newClass || preserved.has(rename.oldClass)) return;
+      const classPattern = new RegExp(`(\\bclassList\\.(?:add|remove|toggle|contains|replace)\\(\\s*)(['"\u0060])${escape(rename.oldClass)}\\2`, 'g');
+      code = code.replace(classPattern, (whole, prefix, quote) => `${prefix}${quote}${rename.newClass}${quote}`);
+    });
+
+    /* Keep open editor state and preview arrows consistent with the code. */
+    ['activeVisualLink', 'previewLinkArrow', 'visualLinkDraft'].forEach(property => {
+      if (!this[property] || typeof this[property] !== 'object') return;
+      this[property] = this.rewriteIdentityMetadata(this[property], options);
+    });
+    if (this.pendingVisualLinkSourceId === oldId) this.pendingVisualLinkSourceId = newId;
+
+    if (code === before) return 0;
+    this.customJS = code;
+    this._vlCacheJs = null;
+    this.refreshEditorContent();
+    if (typeof this.renderVisualLinksDashboard === 'function') this.renderVisualLinksDashboard();
+    if (typeof this.renderGlobalInteractionsDashboard === 'function') this.renderGlobalInteractionsDashboard();
+    if (typeof this.scanAndRenderVariables === 'function') this.scanAndRenderVariables();
+    return 1;
+  }
+
   getActionArabicLabel(action) {
     const labels = {
       custom: 'منطق مخصص',
@@ -3158,6 +3298,136 @@ getAllCanvasElements() {
 
   /* id/varName كانوا بيتحطوا خام في new RegExp — id زي a(b) كان يرمي SyntaxError
      أو يطابق غلط. أي حرف خاص بيتهرّب دلوقتي. */
+  /*
+   * Remove builder-owned JavaScript that points at HTML which is about to be
+   * deleted. Raw user JavaScript is deliberately left alone; only blocks with
+   * OSOOS metadata (plus unused generated declarations) are eligible. The
+   * caller performs the single sync/history commit after removing the HTML.
+   */
+  cleanupReferencesForDeletedElements(context = {}) {
+    const deletedIds = context.deletedIds instanceof Set
+      ? context.deletedIds
+      : new Set(context.deletedIds || []);
+    const selectorIsOrphan = typeof context.selectorIsOrphan === 'function'
+      ? context.selectorIsOrphan
+      : () => false;
+    if (!deletedIds.size && !context.hasOrphanSelectors) {
+      return { changed: false, visualLinks: 0, components: 0, interactions: 0, blocks: 0, variables: 0 };
+    }
+
+    const elementIdKey = key => key === '__targetId' ||
+      /(?:source|target|element|trigger|content|panel|tab|container|modal|overlay|title|description|menu|wrapper|sidebar|navItem)Id$/i.test(key);
+    const valueReferencesDeletedElement = (value, key = '', parent = null, depth = 0) => {
+      if (depth > 24 || value === null || value === undefined) return false;
+      if (typeof value === 'string') {
+        if ((elementIdKey(key) || (key === 'id' && parent && Object.prototype.hasOwnProperty.call(parent, 'selector'))) && deletedIds.has(value)) {
+          return true;
+        }
+        if ((key === 'selector' || /Selector$/i.test(key)) && value && selectorIsOrphan(value)) return true;
+        return false;
+      }
+      if (Array.isArray(value)) {
+        return value.some(item => valueReferencesDeletedElement(item, key, value, depth + 1));
+      }
+      if (typeof value !== 'object') return false;
+      return Object.keys(value).some(childKey => valueReferencesDeletedElement(value[childKey], childKey, value, depth + 1));
+    };
+
+    const ranges = [];
+    const removedLinkIds = [];
+    const addRange = (entry, type) => {
+      if (!entry || !Number.isInteger(entry.startIndex) || !Number.isInteger(entry.endIndex)) return;
+      ranges.push({ startIndex: entry.startIndex, endIndex: entry.endIndex, type, id: entry.id || '' });
+      if (type === 'visualLinks' || type === 'components') removedLinkIds.push(entry.id || '');
+    };
+
+    const core = typeof window !== 'undefined' ? window.VisualLogicCore : null;
+    const visualLinks = typeof this.parseVisualLinks === 'function' ? this.parseVisualLinks() : [];
+    visualLinks.forEach(link => {
+      let linked = deletedIds.has(link.sourceId) || deletedIds.has(link.targetId) || valueReferencesDeletedElement(link);
+      if (!linked && core && typeof core.getRelationships === 'function') {
+        try {
+          linked = core.getRelationships(link).some(relation =>
+            deletedIds.has(relation.sourceId) || deletedIds.has(relation.targetId));
+        } catch (error) { /* Invalid legacy metadata is handled by its parser. */ }
+      }
+      if (linked) addRange(link, 'visualLinks');
+    });
+
+    const components = typeof this.parseComponents === 'function' ? this.parseComponents() : [];
+    components.forEach(component => {
+      if (valueReferencesDeletedElement(component.metadata || component)) addRange(component, 'components');
+    });
+
+    const interactions = typeof this.parseInteractions === 'function' ? this.parseInteractions() : [];
+    interactions.forEach(interaction => {
+      if (deletedIds.has(interaction.sourceId) || deletedIds.has(interaction.targetId)) addRange(interaction, 'interactions');
+    });
+
+    const blocks = typeof this.parseJsBlocks === 'function' ? this.parseJsBlocks() : [];
+    blocks.forEach(block => {
+      if (block.metadataValid && valueReferencesDeletedElement(block.params || {})) addRange(block, 'blocks');
+    });
+
+    const counts = { visualLinks: 0, components: 0, interactions: 0, blocks: 0 };
+    const uniqueRanges = [];
+    ranges
+      .sort((a, b) => b.startIndex - a.startIndex || b.endIndex - a.endIndex)
+      .forEach(range => {
+        if (uniqueRanges.some(existing => range.startIndex >= existing.startIndex && range.endIndex <= existing.endIndex)) return;
+        uniqueRanges.push(range);
+        counts[range.type] += 1;
+      });
+
+    const lines = String(this.customJS || '').split(/\r?\n/);
+    uniqueRanges.forEach(range => lines.splice(range.startIndex, range.endIndex - range.startIndex + 1));
+    let nextJS = lines.join('\n');
+
+    // Drop an unused declaration generated by "define a variable for this
+    // element". If raw code still uses that variable, preserve it: raw source
+    // has no reliable ownership boundary and must never be truncated by guess.
+    let removedVariables = 0;
+    const declarationPattern = /(^[ \t]*\/\/[^\n]*\n)?(^[ \t]*const\s+([A-Za-z_$][\w$]*)\s*=\s*document\.(?:getElementById\(\s*(["'])(.*?)\4\s*\)|querySelector\(\s*(["'])#(.*?)\6\s*\))\s*;?[ \t]*$)/gm;
+    const declarations = [];
+    let declarationMatch;
+    while ((declarationMatch = declarationPattern.exec(nextJS)) !== null) {
+      const elementId = declarationMatch[5] || declarationMatch[7] || '';
+      if (!deletedIds.has(elementId)) continue;
+      declarations.push({
+        start: declarationMatch.index,
+        end: declarationMatch.index + declarationMatch[0].length,
+        variable: declarationMatch[3]
+      });
+    }
+    declarations.reverse().forEach(declaration => {
+      const withoutDeclaration = nextJS.slice(0, declaration.start) + nextJS.slice(declaration.end);
+      const variableUse = new RegExp(`\\b${this.regexEscape(declaration.variable)}\\b`);
+      if (variableUse.test(withoutDeclaration)) return;
+      nextJS = withoutDeclaration;
+      removedVariables += 1;
+    });
+
+    const changed = nextJS !== this.customJS;
+    if (changed) {
+      this.customJS = nextJS.replace(/\n{3,}/g, '\n\n').trimEnd();
+      this._vlCacheJs = null;
+      this._vlCacheLinks = [];
+      removedLinkIds.filter(Boolean).forEach(id => {
+        if (this.hiddenLinkArrows) delete this.hiddenLinkArrows[id];
+      });
+      if (this.currentLanguage === 'js' && this.textarea) {
+        this.textarea.value = this.customJS;
+        this.updateLineNumbers();
+      }
+      const active = this.activeVisualLink;
+      if (active && (deletedIds.has(active.sourceId) || deletedIds.has(active.targetId))) {
+        if (typeof this.closeVisualLinkPopup === 'function') this.closeVisualLinkPopup();
+      }
+    }
+
+    return Object.assign({ changed, variables: removedVariables }, counts);
+  }
+
   regexEscape(value) {
     return String(value === undefined || value === null ? '' : value)
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
