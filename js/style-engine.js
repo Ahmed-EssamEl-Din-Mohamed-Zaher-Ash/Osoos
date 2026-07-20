@@ -203,6 +203,507 @@ class OsoosStyleEngine {
     return removed;
   }
 
+  /*
+   * Cascade cleanup helpers
+   * -----------------------
+   * A deleted HTML branch may be referenced by both inspector-managed rules
+   * and hand-written CSS.  Selector lists are handled one branch at a time so
+   * `.deleted-card, .shared-card` keeps the still-useful `.shared-card` rule.
+   */
+  splitSelectorList(selectorText) {
+    const source = String(selectorText || '');
+    const selectors = [];
+    let start = 0;
+    let quote = '';
+    let escaped = false;
+    let squareDepth = 0;
+    let roundDepth = 0;
+
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      if (escaped) { escaped = false; continue; }
+      if (char === '\\') { escaped = true; continue; }
+      if (quote) {
+        if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '[') squareDepth += 1;
+      else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+      else if (char === '(') roundDepth += 1;
+      else if (char === ')') roundDepth = Math.max(0, roundDepth - 1);
+      else if (char === ',' && squareDepth === 0 && roundDepth === 0) {
+        const part = source.slice(start, index).trim();
+        if (part) selectors.push(part);
+        start = index + 1;
+      }
+    }
+    const tail = source.slice(start).trim();
+    if (tail) selectors.push(tail);
+    return selectors;
+  }
+
+  decodeCssIdentifier(identifier) {
+    return String(identifier || '').replace(/\\([0-9a-fA-F]{1,6})(?:\s)?|\\(.)/g, (match, hex, escapedChar) => {
+      if (hex) {
+        try { return String.fromCodePoint(parseInt(hex, 16)); } catch (error) { return match; }
+      }
+      return escapedChar || '';
+    });
+  }
+
+  selectorIdentityTokens(selectorText) {
+    const source = String(selectorText || '');
+    const ids = new Set();
+    const classes = new Set();
+    let quote = '';
+    let inComment = false;
+
+    const consumeIdentifier = start => {
+      let cursor = start;
+      let raw = '';
+      while (cursor < source.length) {
+        const char = source[cursor];
+        if (char === '\\' && cursor + 1 < source.length) {
+          raw += char;
+          cursor += 1;
+          let hexCount = 0;
+          while (cursor < source.length && /[0-9a-fA-F]/.test(source[cursor]) && hexCount < 6) {
+            raw += source[cursor++];
+            hexCount += 1;
+          }
+          if (!hexCount) raw += source[cursor++];
+          else if (cursor < source.length && /\s/.test(source[cursor])) raw += source[cursor++];
+          continue;
+        }
+        if (/[a-zA-Z0-9_-]/.test(char) || char.charCodeAt(0) >= 128) {
+          raw += char;
+          cursor += 1;
+          continue;
+        }
+        break;
+      }
+      return { value: this.decodeCssIdentifier(raw), end: cursor };
+    };
+
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      if (inComment) {
+        if (char === '*' && source[index + 1] === '/') { inComment = false; index += 1; }
+        continue;
+      }
+      if (!quote && char === '/' && source[index + 1] === '*') { inComment = true; index += 1; continue; }
+      if (quote) {
+        if (char === '\\') index += 1;
+        else if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char !== '#' && char !== '.') continue;
+      const token = consumeIdentifier(index + 1);
+      if (!token.value) continue;
+      (char === '#' ? ids : classes).add(token.value);
+      index = token.end - 1;
+    }
+
+    // Attribute selectors are also identity selectors, for example
+    // [id="hero"] and [class~="feature-card"].
+    source.replace(/\[\s*id\s*=\s*(["'])(.*?)\1\s*\]/gi, (match, q, value) => {
+      if (value) ids.add(this.decodeCssIdentifier(value));
+      return match;
+    });
+    source.replace(/\[\s*class\s*(?:=|~=)\s*(["'])(.*?)\1\s*\]/gi, (match, q, value) => {
+      String(value || '').split(/\s+/).filter(Boolean).forEach(valuePart => classes.add(this.decodeCssIdentifier(valuePart)));
+      return match;
+    });
+
+    return { ids, classes };
+  }
+
+  selectorReferencesIdentities(selectorText, identities = {}) {
+    const removedIds = identities.ids instanceof Set ? identities.ids : new Set(identities.ids || []);
+    const removedClasses = identities.classes instanceof Set ? identities.classes : new Set(identities.classes || []);
+    const tokens = this.selectorIdentityTokens(selectorText);
+    return Array.from(tokens.ids).some(id => removedIds.has(id)) ||
+      Array.from(tokens.classes).some(className => removedClasses.has(className));
+  }
+
+  removeRulesForIdentities(identities = {}, commit = true) {
+    let removed = 0;
+    const nextRules = {};
+
+    Object.values(this.rules).forEach(rule => {
+      if (!rule) return;
+      const selectors = this.splitSelectorList(rule.selector);
+      const kept = selectors.filter(selector => !this.selectorReferencesIdentities(selector, identities));
+      removed += selectors.length - kept.length;
+      if (!kept.length) return;
+
+      const selector = kept.join(', ');
+      const nextRule = Object.assign({}, rule, { selector });
+      const nextKey = this.makeRuleKey(selector, rule.breakpoint, rule.pseudo);
+      if (nextRules[nextKey]) {
+        // Two selector lists can collapse to the same surviving selector.
+        // Preserve both declaration sets using normal later-rule precedence.
+        nextRule.declarations = Object.assign({}, nextRules[nextKey].declarations, nextRule.declarations);
+      }
+      nextRules[nextKey] = nextRule;
+    });
+
+    this.rules = nextRules;
+    if (removed && commit) this.commitToEditor();
+    return removed;
+  }
+
+  _cssLeadingTriviaLength(segment) {
+    let index = 0;
+    while (index < segment.length) {
+      if (/\s/.test(segment[index])) { index += 1; continue; }
+      if (segment[index] === '/' && segment[index + 1] === '*') {
+        const end = segment.indexOf('*/', index + 2);
+        if (end === -1) return segment.length;
+        index = end + 2;
+        continue;
+      }
+      break;
+    }
+    return index;
+  }
+
+  _nextCssBoundary(source, start) {
+    let quote = '';
+    let roundDepth = 0;
+    let squareDepth = 0;
+    for (let index = start; index < source.length; index += 1) {
+      const char = source[index];
+      if (quote) {
+        if (char === '\\') index += 1;
+        else if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '/' && source[index + 1] === '*') {
+        const end = source.indexOf('*/', index + 2);
+        if (end === -1) return null;
+        index = end + 1;
+        continue;
+      }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '(') roundDepth += 1;
+      else if (char === ')') roundDepth = Math.max(0, roundDepth - 1);
+      else if (char === '[') squareDepth += 1;
+      else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+      else if (!roundDepth && !squareDepth && (char === '{' || char === ';')) return { index, char };
+    }
+    return null;
+  }
+
+  _matchingCssBrace(source, openIndex) {
+    let depth = 1;
+    let quote = '';
+    for (let index = openIndex + 1; index < source.length; index += 1) {
+      const char = source[index];
+      if (quote) {
+        if (char === '\\') index += 1;
+        else if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '/' && source[index + 1] === '*') {
+        const end = source.indexOf('*/', index + 2);
+        if (end === -1) return source.length - 1;
+        index = end + 1;
+        continue;
+      }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '{') depth += 1;
+      else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+    return source.length - 1;
+  }
+
+  rewriteCssRules(css, shouldRemoveSelector) {
+    const source = String(css || '');
+    let output = '';
+    let cursor = 0;
+
+    while (cursor < source.length) {
+      const boundary = this._nextCssBoundary(source, cursor);
+      if (!boundary) { output += source.slice(cursor); break; }
+      if (boundary.char === ';') {
+        output += source.slice(cursor, boundary.index + 1);
+        cursor = boundary.index + 1;
+        continue;
+      }
+
+      const closeIndex = this._matchingCssBrace(source, boundary.index);
+      const segment = source.slice(cursor, boundary.index);
+      const triviaLength = this._cssLeadingTriviaLength(segment);
+      const trivia = segment.slice(0, triviaLength);
+      const rawHeader = segment.slice(triviaLength);
+      const header = rawHeader.trim();
+      const trailingWhitespace = (rawHeader.match(/\s*$/) || [''])[0];
+      const body = source.slice(boundary.index + 1, closeIndex);
+
+      if (!header) {
+        output += source.slice(cursor, closeIndex + 1);
+      } else if (header.startsWith('@')) {
+        // Recursing through grouping at-rules keeps @media/@supports/@layer
+        // intact and is harmless for declaration-only blocks such as
+        // @font-face (their semicolon statements pass through unchanged).
+        output += trivia + rawHeader + '{' + this.rewriteCssRules(body, shouldRemoveSelector) + '}';
+      } else {
+        const selectors = this.splitSelectorList(header);
+        const kept = selectors.filter(selector => !shouldRemoveSelector(selector));
+        if (!kept.length) {
+          // Preserve surrounding comments/spacing, but drop the orphan rule.
+          output += trivia;
+        } else if (kept.length === selectors.length) {
+          output += source.slice(cursor, closeIndex + 1);
+        } else {
+          output += trivia + kept.join(', ') + trailingWhitespace + '{' + body + '}';
+        }
+      }
+      cursor = closeIndex + 1;
+    }
+    return output;
+  }
+
+  removeUnmanagedRulesForIdentities(css, identities = {}) {
+    return this.rewriteCssRules(css, selector => this.selectorReferencesIdentities(selector, identities));
+  }
+
+  /*
+   * Rename-safe selector helpers. Identity edits are intentionally handled in
+   * the style engine instead of with a blind string replacement: `#abc` may be
+   * a colour in declarations, and a shared `.card` must keep styling the other
+   * cards when one element is renamed.
+   */
+  regexEscape(value) {
+    return String(value === undefined || value === null ? '' : value)
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  selectorTokenCandidates(value) {
+    const raw = String(value === undefined || value === null ? '' : value);
+    const escaped = this.escapeSelectorId(raw);
+    return Array.from(new Set([escaped, raw].filter(Boolean)))
+      .sort((left, right) => right.length - left.length);
+  }
+
+  selectorHasToken(selector, prefix, value) {
+    return this.selectorTokenCandidates(value).some(candidate => {
+      const pattern = new RegExp(`${this.regexEscape(prefix)}${this.regexEscape(candidate)}(?![-_a-zA-Z0-9\\u00A0-\\uFFFF])`, 'u');
+      return pattern.test(String(selector || ''));
+    });
+  }
+
+  replaceSelectorToken(selector, prefix, oldValue, newValue) {
+    let result = String(selector || '');
+    const replacement = `${prefix}${this.escapeSelectorId(newValue)}`;
+    this.selectorTokenCandidates(oldValue).forEach(candidate => {
+      const pattern = new RegExp(`${this.regexEscape(prefix)}${this.regexEscape(candidate)}(?![-_a-zA-Z0-9\\u00A0-\\uFFFF])`, 'gu');
+      result = result.replace(pattern, replacement);
+    });
+    return result;
+  }
+
+  selectorHasAttributeIdentity(selector, attribute, value) {
+    const pattern = /(\[\s*(id|class)\s*(~=|=)\s*)(?:"([^"]*)"|'([^']*)'|([^\]\s]+))(\s*\])/g;
+    let match;
+    while ((match = pattern.exec(String(selector || ''))) !== null) {
+      const actualValue = match[4] !== undefined ? match[4] : (match[5] !== undefined ? match[5] : match[6]);
+      if (match[2].toLowerCase() === String(attribute || '').toLowerCase() && actualValue === String(value || '')) return true;
+    }
+    return false;
+  }
+
+  replaceAttributeIdentity(selector, attribute, oldValue, newValue) {
+    const expectedAttribute = String(attribute || '').toLowerCase();
+    const expectedValue = String(oldValue || '');
+    const pattern = /(\[\s*(id|class)\s*(~=|=)\s*)(?:"([^"]*)"|'([^']*)'|([^\]\s]+))(\s*\])/g;
+    return String(selector || '').replace(pattern, (whole, prefix, name, operator, doubleQuoted, singleQuoted, bare, suffix) => {
+      const actualValue = doubleQuoted !== undefined ? doubleQuoted : (singleQuoted !== undefined ? singleQuoted : bare);
+      if (name.toLowerCase() !== expectedAttribute || actualValue !== expectedValue) return whole;
+      const quote = doubleQuoted !== undefined ? '"' : (singleQuoted !== undefined ? "'" : '');
+      return `${prefix}${quote}${newValue}${quote}${suffix}`;
+    });
+  }
+
+  splitIdentitySelectorList(selector) {
+    const parts = [];
+    let start = 0;
+    let squareDepth = 0;
+    let roundDepth = 0;
+    let quote = '';
+    let escaped = false;
+    const source = String(selector || '');
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '[') squareDepth += 1;
+      else if (char === ']') squareDepth = Math.max(0, squareDepth - 1);
+      else if (char === '(') roundDepth += 1;
+      else if (char === ')') roundDepth = Math.max(0, roundDepth - 1);
+      else if (char === ',' && squareDepth === 0 && roundDepth === 0) {
+        parts.push(source.slice(start, index).trim());
+        start = index + 1;
+      }
+    }
+    parts.push(source.slice(start).trim());
+    return parts.filter(Boolean);
+  }
+
+  rewriteSelectorReferences(selector, options = {}) {
+    const oldId = String(options.oldId || '');
+    const newId = String(options.newId || '');
+    const classRenames = Array.isArray(options.classRenames) ? options.classRenames : [];
+    const preserveOldClasses = new Set(options.preserveOldClasses || []);
+
+    const rewritten = [];
+    this.splitIdentitySelectorList(selector).forEach(selectorPart => {
+      const wasIdScoped = !!oldId && (
+        this.selectorHasToken(selectorPart, '#', oldId) ||
+        this.selectorHasAttributeIdentity(selectorPart, 'id', oldId)
+      );
+      let idRewritten = selectorPart;
+      if (oldId && newId) {
+        idRewritten = this.replaceSelectorToken(idRewritten, '#', oldId, newId);
+        idRewritten = this.replaceAttributeIdentity(idRewritten, 'id', oldId, newId);
+      }
+      let variants = [idRewritten];
+
+      classRenames.forEach(rename => {
+        const oldClass = String(rename.oldClass || '');
+        const newClass = String(rename.newClass || '');
+        if (!oldClass || !newClass || oldClass === newClass) return;
+        const next = [];
+        variants.forEach(variant => {
+          const hasClassReference = this.selectorHasToken(variant, '.', oldClass) ||
+            this.selectorHasAttributeIdentity(variant, 'class', oldClass);
+          if (!hasClassReference) {
+            next.push(variant);
+            return;
+          }
+          let changed = this.replaceSelectorToken(variant, '.', oldClass, newClass);
+          changed = this.replaceAttributeIdentity(changed, 'class', oldClass, newClass);
+          /* A global shared class keeps its old branch and gains the new one.
+             An ID-scoped rule belongs only to the renamed element, so retaining
+             an impossible #new.old branch would only leave dead CSS. */
+          if (preserveOldClasses.has(oldClass) && !wasIdScoped) next.push(variant);
+          next.push(changed);
+        });
+        variants = Array.from(new Set(next));
+      });
+
+      rewritten.push(...variants);
+    });
+    return Array.from(new Set(rewritten)).join(', ');
+  }
+
+  rewriteCssSelectorPreludes(css, options = {}) {
+    const source = String(css || '');
+    let output = '';
+    let segmentStart = 0;
+    let quote = '';
+    let escaped = false;
+    let inComment = false;
+
+    const rewritePrelude = prelude => {
+      const leading = (prelude.match(/^\s*/) || [''])[0];
+      const trailing = (prelude.match(/\s*$/) || [''])[0];
+      const core = prelude.slice(leading.length, prelude.length - trailing.length);
+      if (!core || core.trim().startsWith('@')) return prelude;
+      /* Leave comments byte-for-byte intact while rewriting selector tokens. */
+      const guards = [];
+      const protectedCore = core.replace(/\/\*[\s\S]*?\*\//g, comment => {
+        guards.push(comment);
+        return `\u0001${guards.length - 1}\u0001`;
+      });
+      const changed = this.rewriteSelectorReferences(protectedCore, options)
+        .replace(/\u0001(\d+)\u0001/g, (match, index) => guards[Number(index)] || match);
+      return `${leading}${changed}${trailing}`;
+    };
+
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      const next = source[index + 1];
+      if (inComment) {
+        if (char === '*' && next === '/') { inComment = false; index += 1; }
+        continue;
+      }
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '/' && next === '*') { inComment = true; index += 1; continue; }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '{') {
+        output += rewritePrelude(source.slice(segmentStart, index)) + '{';
+        segmentStart = index + 1;
+      } else if (char === '}') {
+        output += source.slice(segmentStart, index + 1);
+        segmentStart = index + 1;
+      }
+    }
+    return output + source.slice(segmentStart);
+  }
+
+  renameElementReferences(options = {}, commit = true) {
+    const oldId = String(options.oldId || '');
+    const newId = String(options.newId || '');
+    const classRenames = Array.isArray(options.classRenames) ? options.classRenames : [];
+    if ((!oldId || !newId || oldId === newId) && !classRenames.length) return 0;
+
+    const nextRules = {};
+    let changed = 0;
+    Object.values(this.rules).forEach(rule => {
+      if (!rule) return;
+      const rewrittenSelector = this.rewriteSelectorReferences(rule.selector, options);
+      if (rewrittenSelector !== rule.selector) changed += 1;
+      /* Keep expanded selector branches as independent managed rules. This is
+         important for pseudo states: `.old, .new` + `:hover` would otherwise
+         render as `.old, .new:hover` and miss hover on the old shared branch. */
+      this.splitIdentitySelectorList(rewrittenSelector).forEach(selector => {
+        const nextRule = {
+          selector,
+          breakpoint: rule.breakpoint,
+          pseudo: rule.pseudo,
+          declarations: { ...rule.declarations }
+        };
+        const key = this.makeRuleKey(selector, rule.breakpoint, rule.pseudo);
+        if (nextRules[key]) {
+          nextRules[key].declarations = { ...nextRules[key].declarations, ...nextRule.declarations };
+        } else {
+          nextRules[key] = nextRule;
+        }
+      });
+    });
+    this.rules = nextRules;
+
+    if (this.app.editor) {
+      const unmanaged = this.stripManagedBlock(this.app.editor.customCSS || '');
+      const rewritten = this.rewriteCssSelectorPreludes(unmanaged, options);
+      if (rewritten !== unmanaged) changed += 1;
+      this.app.editor.customCSS = rewritten;
+    }
+    if (this.activeSelector) {
+      this.activeSelector = this.rewriteSelectorReferences(this.activeSelector, options);
+    }
+    if (commit) this.commitToEditor();
+    else this.updatePreview();
+    return changed;
+  }
+
   pseudoSuffix(pseudo) {
     const suffixes = {
       normal: '',
