@@ -14,6 +14,12 @@
   <link rel="stylesheet" href="css/preview.css">
   <link rel="stylesheet" href="css/visual-logic-phase-a.css">
   <link rel="stylesheet" href="css/project-manager.css">
+  <link rel="stylesheet" href="css/responsive-shell.css">
+  <link rel="stylesheet" href="css/selection-toolbar-responsive.css">
+  <link rel="stylesheet" href="css/onboarding-tour.css">
+  <link rel="stylesheet" href="css/element-identity.css">
+  <link rel="stylesheet" href="css/dom-tree-clarity.css">
+  <link rel="stylesheet" href="css/accessibility-polish.css">
   
   <!-- Icons (FontAwesome for professional UI) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1110,7 +1116,7 @@
           <!-- Preview breadcrumb topbar -->
           <div class="preview-header-bar">
             <div class="preview-header-right">
-              <span>اضغط لتختار - اسحب للتداخل</span>
+              <span id="canvas-interaction-hint">اختر عنصرًا بالنقر — واسحب فقط لإعادة ترتيبه</span>
             </div>
             <div class="preview-header-left">
               <span class="preview-breadcrumbs" id="canvas-breadcrumbs">body</span>
@@ -1124,7 +1130,7 @@
               <section class="hero">
                 <div class="card">
                   <h1 style="font-size: 24px; margin-bottom: 8px;">موقع البرمجة التفاعلية</h1>
-                  <p style="color: #6b7280; font-size: 14px;">اسحب العناصر من القائمة اليمنى وأفلتها هنا لبناء موقعك.</p>
+                  <p style="color: #6b7280; font-size: 14px;">ابدأ من لوحة العناصر: اختر مكونًا، عدّل محتواه، ثم عاينه واحفظه.</p>
                   <button>ابدأ التصميم الآن</button>
                 </div>
               </section>
@@ -1336,5 +1342,10 @@
   <script src="js/dom-tree.js"></script>
   <script src="js/project-manager.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/beginner-mode.js"></script>
+  <script src="js/responsive-shell.js"></script>
+  <script src="js/selection-toolbar-responsive.js"></script>
+  <script src="js/dom-tree-clarity.js"></script>
+  <script src="js/onboarding-tour.js"></script>
 </body>
 </html>
