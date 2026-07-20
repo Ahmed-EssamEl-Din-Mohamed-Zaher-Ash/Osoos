@@ -1,0 +1,220 @@
+/* Responsive, accessible controls for the selected element overlay. */
+
+#element-highlighter .floating-action-bubble.selection-toolbar-enhanced {
+  --selection-toolbar-gap: 8px;
+  --selection-toolbar-sheet-bottom: 0px;
+  box-sizing: border-box;
+  position: fixed;
+  min-height: 40px;
+  max-width: var(--selection-toolbar-max-width, min(520px, calc(100vw - 24px)));
+  padding: 4px;
+  gap: 4px;
+  direction: rtl;
+  isolation: isolate;
+  transition: none;
+}
+
+.selection-toolbar-enhanced .bubble-el-name-badge {
+  flex: 0 0 auto;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-toolbar-primary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selection-toolbar-primary .selection-action-wrapper {
+  position: relative !important;
+  display: flex !important;
+  align-items: center;
+}
+
+.selection-toolbar-enhanced .bubble-btn {
+  min-width: 34px;
+  min-height: 34px;
+  height: 34px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.selection-toolbar-enhanced .bubble-btn:focus-visible,
+.selection-toolbar-menu .bubble-btn:focus-visible,
+.selection-toolbar-enhanced .layers-dropdown-item:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-main);
+}
+
+.selection-toolbar-more-button[aria-expanded="true"] {
+  background-color: var(--bg-tertiary);
+  color: var(--accent-orange);
+}
+
+.selection-toolbar-menu {
+  position: absolute;
+  z-index: 1200;
+  inset-inline-end: 0;
+  top: calc(100% + 6px);
+  width: min(238px, calc(100vw - 24px));
+  padding: 6px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-lg);
+  direction: rtl;
+  pointer-events: auto;
+}
+
+.selection-toolbar-menu[hidden] {
+  display: none !important;
+}
+
+.selection-toolbar-menu.selection-menu-above {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.selection-toolbar-menu .bubble-btn {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 38px;
+  height: auto;
+  padding: 7px 10px;
+  justify-content: flex-start;
+  text-align: right;
+}
+
+.selection-toolbar-menu .bubble-btn + .bubble-btn {
+  margin-top: 2px;
+}
+
+.selection-toolbar-menu #bubble-delete {
+  color: var(--accent-red) !important;
+}
+
+.selection-toolbar-menu #bubble-delete:hover,
+.selection-toolbar-menu #bubble-delete:focus-visible {
+  background: color-mix(in srgb, var(--accent-red) 14%, transparent);
+}
+
+.selection-toolbar-enhanced.selection-toolbar-tight .selection-toolbar-primary .bubble-btn,
+.selection-toolbar-enhanced.selection-toolbar-tight .selection-toolbar-more-button {
+  width: 38px;
+  min-width: 38px;
+  padding-inline: 0;
+  font-size: 0;
+}
+
+.selection-toolbar-enhanced.selection-toolbar-tight .selection-toolbar-primary .bubble-btn i,
+.selection-toolbar-enhanced.selection-toolbar-tight .selection-toolbar-more-button i {
+  font-size: 12px;
+}
+
+.selection-toolbar-enhanced.selection-toolbar-tight .bubble-el-name-badge {
+  max-width: 56px;
+}
+
+.selection-toolbar-enhanced .highlighter-layers-dropdown {
+  box-sizing: border-box;
+  max-width: min(280px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767.98px) {
+  #element-highlighter .floating-action-bubble.selection-toolbar-enhanced {
+    position: fixed !important;
+    z-index: 10020;
+    top: auto !important;
+    right: 0 !important;
+    bottom: var(--selection-toolbar-sheet-bottom) !important;
+    left: 0 !important;
+    display: grid;
+    grid-template-columns: minmax(42px, auto) minmax(0, 1fr) 48px;
+    align-items: center;
+    width: 100vw;
+    max-width: none;
+    min-height: 64px;
+    padding: 8px max(10px, env(safe-area-inset-right))
+      calc(8px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    border: 1px solid var(--border-light);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.3);
+    transform: none !important;
+  }
+
+  .selection-toolbar-enhanced .bubble-el-name-badge {
+    grid-column: 1;
+    grid-row: 2;
+    max-width: 68px;
+    text-align: center;
+  }
+
+  .selection-toolbar-primary {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: center;
+  }
+
+  .selection-toolbar-more-button {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .selection-toolbar-enhanced .bubble-btn {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .selection-toolbar-menu {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    max-height: min(44vh, 320px);
+    margin: 0 0 8px;
+    overflow-y: auto;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 12px;
+    box-shadow: none;
+  }
+
+  .selection-toolbar-menu.selection-menu-above {
+    position: static;
+  }
+
+  .selection-toolbar-menu .bubble-btn {
+    min-height: 44px;
+  }
+
+  .selection-toolbar-enhanced .highlighter-layers-dropdown {
+    position: fixed !important;
+    z-index: 10030 !important;
+    top: auto !important;
+    right: 12px !important;
+    bottom: calc(var(--selection-toolbar-sheet-bottom) + 72px) !important;
+    left: 12px !important;
+    width: auto !important;
+    max-width: none;
+    max-height: min(50vh, 360px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #element-highlighter .floating-action-bubble.selection-toolbar-enhanced,
+  .selection-toolbar-menu {
+    scroll-behavior: auto;
+    transition: none !important;
+  }
+}

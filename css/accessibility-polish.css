@@ -1,0 +1,374 @@
+/*
+ * Accessibility polish for the editor chrome.
+ *
+ * This file deliberately avoids #builder-canvas and the final-preview iframe:
+ * user-authored pages keep their own typography and component dimensions.
+ */
+
+:root {
+  --a11y-panel-font-size: 13px;
+  --a11y-secondary-font-size: 12px;
+  --a11y-target-desktop: 32px;
+  --a11y-target-touch: 44px;
+  --a11y-focus-color: #fbbf24;
+  --a11y-focus-shadow: rgb(245 158 11 / 32%);
+}
+
+/* --------------------------------------------------------------------------
+   Readability: editor panels use 13px body text; supporting copy never drops
+   below 12px. `!important` is intentional because much of the legacy UI uses
+   inline 8–11px declarations.
+   -------------------------------------------------------------------------- */
+
+:is(
+  .side-panel,
+  .bottom-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .icon-picker-dialog,
+  .vl-popup,
+  .e13-doc-panel,
+  .floating-action-bubble,
+  .selection-toolbar,
+  .selection-action-sheet,
+  [class*="onboarding"]
+) {
+  font-size: var(--a11y-panel-font-size);
+}
+
+:is(
+  .side-panel,
+  .bottom-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .icon-picker-dialog,
+  .vl-popup,
+  .e13-doc-panel,
+  .floating-action-bubble,
+  .selection-toolbar,
+  .selection-action-sheet,
+  [class*="onboarding"]
+) :where(button, input, select, textarea, label, summary, p, small, strong, span, code, li, dt, dd, div, section, article) {
+  font-size: max(var(--a11y-secondary-font-size), 1em) !important;
+}
+
+.side-panel :where(.panel-header, .accordion-summary),
+.bottom-panel :where(.editor-tabs, .dom-tree-node-wrapper) {
+  font-size: var(--a11y-panel-font-size) !important;
+}
+
+.app-header :where(
+  #header-active-file-label,
+  .project-title > span:last-child,
+  .breadcrumb-badge,
+  .checkbox-container
+),
+.preview-header-bar,
+.responsive-panel-nav,
+.toast-notice,
+.final-preview-topbar :where(button, span, strong) {
+  font-size: var(--a11y-secondary-font-size) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Interaction targets. Desktop controls are at least 32px; narrow/coarse
+   pointer layouts rise to the WCAG-friendly 44px touch size.
+   -------------------------------------------------------------------------- */
+
+:is(
+  .app-header,
+  .thin-sidebar,
+  .side-panel,
+  .bottom-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .icon-picker-dialog,
+  .vl-popup,
+  .e13-doc-panel,
+  .floating-action-bubble,
+  .selection-toolbar,
+  .selection-action-sheet,
+  .responsive-panel-nav,
+  .final-preview-topbar,
+  [class*="onboarding"]
+) :where(
+  button,
+  [role="button"],
+  [role="treeitem"],
+  summary,
+  a[href],
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+) {
+  min-height: var(--a11y-target-desktop) !important;
+}
+
+:is(
+  .app-header,
+  .thin-sidebar,
+  .side-panel,
+  .bottom-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .icon-picker-dialog,
+  .vl-popup,
+  .e13-doc-panel,
+  .floating-action-bubble,
+  .selection-toolbar,
+  .selection-action-sheet,
+  .responsive-panel-nav,
+  .final-preview-topbar,
+  [class*="onboarding"]
+) :where(button, [role="button"], a[href]) {
+  min-width: var(--a11y-target-desktop) !important;
+}
+
+:is(
+  .app-header,
+  .side-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .vl-popup,
+  [class*="onboarding"]
+) :where(label:has(input[type="checkbox"]), label:has(input[type="radio"])) {
+  min-height: var(--a11y-target-desktop) !important;
+}
+
+/* Standard checkboxes/radios remain native, visible, and comfortably legible. */
+:is(
+  .side-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .vl-popup,
+  [class*="onboarding"]
+) :where(input[type="checkbox"], input[type="radio"]) {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  accent-color: var(--accent-orange);
+}
+
+/* --------------------------------------------------------------------------
+   Custom checkbox: visually hide the native control without removing it from
+   keyboard order or the accessibility tree. The visible proxy receives the
+   focus indication through the adjacent-sibling selector.
+   -------------------------------------------------------------------------- */
+
+.checkbox-container {
+  position: relative;
+  min-height: var(--a11y-target-desktop);
+}
+
+.checkbox-container > input[type="checkbox"] {
+  position: absolute !important;
+  display: block !important;
+  width: 1px !important;
+  min-width: 0 !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.checkbox-custom {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-color: var(--border-light);
+}
+
+.checkbox-container > input[type="checkbox"]:checked + .checkbox-custom::after {
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
+}
+
+.checkbox-container:hover .checkbox-custom {
+  border-color: var(--accent-orange);
+}
+
+.checkbox-container > input[type="checkbox"]:focus-visible + .checkbox-custom {
+  outline: 3px solid var(--a11y-focus-color);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--a11y-focus-shadow);
+}
+
+.checkbox-container > input[type="checkbox"]:disabled ~ :where(.checkbox-custom, span) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   One keyboard-focus language across the editor chrome. This intentionally
+   wins over legacy `outline: none` declarations but excludes canvas content.
+   -------------------------------------------------------------------------- */
+
+:is(
+  .app-header,
+  .thin-sidebar,
+  .side-panel,
+  .bottom-panel,
+  .project-drawer,
+  .project-modal,
+  .input-type-dialog,
+  .icon-picker-dialog,
+  .vl-popup,
+  .e13-doc-panel,
+  .floating-action-bubble,
+  .selection-toolbar,
+  .selection-action-sheet,
+  .responsive-panel-nav,
+  .final-preview-topbar,
+  [class*="onboarding"]
+) :where(
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  a[href],
+  [tabindex]:not([tabindex="-1"]),
+  [role="button"],
+  [role="treeitem"]
+):focus-visible {
+  outline: 3px solid var(--a11y-focus-color) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 5px var(--a11y-focus-shadow) !important;
+}
+
+@media (max-width: 767.98px), (pointer: coarse) {
+  :is(
+    .app-header,
+    .thin-sidebar,
+    .side-panel,
+    .bottom-panel,
+    .project-drawer,
+    .project-modal,
+    .input-type-dialog,
+    .icon-picker-dialog,
+    .vl-popup,
+    .e13-doc-panel,
+    .floating-action-bubble,
+    .selection-toolbar,
+    .selection-action-sheet,
+    .responsive-panel-nav,
+    .final-preview-topbar,
+    [class*="onboarding"]
+  ) :where(
+    button,
+    [role="button"],
+    [role="treeitem"],
+    summary,
+    a[href],
+    input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea
+  ) {
+    min-height: var(--a11y-target-touch) !important;
+  }
+
+  :is(
+    .app-header,
+    .thin-sidebar,
+    .side-panel,
+    .bottom-panel,
+    .project-drawer,
+    .project-modal,
+    .input-type-dialog,
+    .icon-picker-dialog,
+    .vl-popup,
+    .e13-doc-panel,
+    .floating-action-bubble,
+    .selection-toolbar,
+    .selection-action-sheet,
+    .responsive-panel-nav,
+    .final-preview-topbar,
+    [class*="onboarding"]
+  ) :where(button, [role="button"], a[href]) {
+    min-width: var(--a11y-target-touch) !important;
+  }
+
+  :is(
+    .app-header,
+    .side-panel,
+    .project-drawer,
+    .project-modal,
+    .input-type-dialog,
+    .vl-popup,
+    [class*="onboarding"]
+  ) :where(label:has(input[type="checkbox"]), label:has(input[type="radio"])),
+  .checkbox-container {
+    min-height: var(--a11y-target-touch) !important;
+  }
+
+  :is(
+    .side-panel,
+    .project-drawer,
+    .project-modal,
+    .input-type-dialog,
+    .vl-popup,
+    [class*="onboarding"]
+  ) :where(input[type="checkbox"], input[type="radio"]) {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+  }
+
+  .checkbox-container > input[type="checkbox"] {
+    width: 1px !important;
+    height: 1px !important;
+  }
+
+  .checkbox-custom {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+  }
+
+  .checkbox-container > input[type="checkbox"]:checked + .checkbox-custom::after {
+    top: 3px;
+    left: 7px;
+    width: 5px;
+    height: 11px;
+  }
+
+  /* The compact workspace navigation was intentionally designed as a 48px
+     primary touch target; keep that stronger size above the generic 44px
+     minimum used by the rest of the editor controls. */
+  .responsive-panel-nav button {
+    min-height: 48px !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :is(
+    .app-header,
+    .thin-sidebar,
+    .side-panel,
+    .bottom-panel,
+    .project-drawer,
+    .project-modal,
+    .input-type-dialog,
+    .icon-picker-dialog,
+    .vl-popup,
+    .responsive-panel-nav,
+    [class*="onboarding"]
+  ) :where(button, input, select, textarea, summary, a[href], [tabindex], [role="button"]):focus-visible,
+  .checkbox-container > input[type="checkbox"]:focus-visible + .checkbox-custom {
+    outline-color: Highlight !important;
+    box-shadow: none !important;
+  }
+}
