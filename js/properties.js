@@ -115,9 +115,324 @@ class PropertiesManager {
     this.setupCssGuidance();
     this.setupBoxShadow();
     this.setupCustomBreakpoints();
+    this.setupElementIdentityEditor();
     this.setActiveBreakpoint('all', { resizeCanvas: false });
     this.syncSegmentActive('units-segmented', 'px');
     this.updatePanelFor(null);
+  }
+
+  get editorOnlyClasses() {
+    return new Set([
+      'selected-element', 'hovered-canvas-element', 'drag-hover-container',
+      'dom-tree-hover-preview', 'canvas-picker-target', 'move-mode-active',
+      'shake-reject'
+    ]);
+  }
+
+  getUserClasses(element = this.selectedElement) {
+    if (!element || !element.classList) return [];
+    const reserved = this.editorOnlyClasses;
+    return Array.from(element.classList).filter(className => !reserved.has(className));
+  }
+
+  setupElementIdentityEditor() {
+    const existing = document.getElementById('element-identity-editor');
+    if (existing) {
+      this.identityEditor = existing;
+      return;
+    }
+    if (!this.selectorDisplay || !this.selectorDisplay.parentElement) return;
+    const selectorBlock = this.selectorDisplay.parentElement.parentElement;
+    if (!selectorBlock) return;
+
+    const editor = document.createElement('section');
+    editor.id = 'element-identity-editor';
+    editor.className = 'element-identity-editor is-empty';
+    editor.setAttribute('aria-labelledby', 'element-identity-title');
+    editor.innerHTML = `
+      <div class="element-identity-heading">
+        <span id="element-identity-title"><i class="fas fa-fingerprint" aria-hidden="true"></i> هوية العنصر</span>
+        <code id="element-identity-tag">—</code>
+      </div>
+      <p class="element-identity-empty" id="element-identity-empty">اختر عنصراً من المعاينة أو شجرة DOM لتعديل هويته.</p>
+      <div class="element-identity-fields">
+        <label class="element-identity-field" for="element-id-input">
+          <span>المعرّف ID</span>
+          <span class="element-identity-input-wrap" dir="ltr"><b aria-hidden="true">#</b><input id="element-id-input" type="text" autocomplete="off" spellcheck="false" maxlength="128" aria-describedby="element-id-hint element-identity-error"></span>
+          <small id="element-id-hint">فريد، يبدأ بحرف، ويسمح بالحروف والأرقام و <code>- _</code>.</small>
+        </label>
+        <label class="element-identity-field" for="element-class-input">
+          <span>الكلاسات Classes</span>
+          <input id="element-class-input" type="text" dir="ltr" autocomplete="off" spellcheck="false" aria-describedby="element-class-hint element-identity-error" placeholder="card featured">
+          <small id="element-class-hint">افصل بمسافة أو فاصلة؛ تُزال النقطة <code>.</code> والتكرارات تلقائياً.</small>
+        </label>
+      </div>
+      <p class="element-identity-error" id="element-identity-error" role="alert" aria-live="assertive" hidden></p>
+      <div class="element-identity-actions">
+        <span id="element-identity-status" role="status" aria-live="polite"></span>
+        <button type="button" class="btn btn-outline" id="element-identity-reset">إعادة</button>
+        <button type="button" class="btn btn-primary" id="element-identity-apply"><i class="fas fa-check" aria-hidden="true"></i> تطبيق الهوية</button>
+      </div>`;
+    selectorBlock.insertAdjacentElement('afterend', editor);
+    this.identityEditor = editor;
+
+    const applyButton = editor.querySelector('#element-identity-apply');
+    const resetButton = editor.querySelector('#element-identity-reset');
+    const inputs = Array.from(editor.querySelectorAll('input'));
+    inputs.forEach(input => {
+      input.addEventListener('input', () => this.validateIdentityEditorDraft());
+      input.addEventListener('keydown', event => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        this.applyIdentityEditorDraft();
+      });
+    });
+    if (applyButton) applyButton.addEventListener('click', () => this.applyIdentityEditorDraft());
+    if (resetButton) resetButton.addEventListener('click', () => this.renderElementIdentityEditor(this.selectedElement));
+  }
+
+  isValidIdentityToken(value) {
+    return /^-?[_a-zA-Z\u00A0-\uFFFF][-_a-zA-Z0-9\u00A0-\uFFFF]*$/u.test(String(value || ''));
+  }
+
+  isValidElementId(value) {
+    return /^[a-zA-Z\u00A0-\uFFFF][-_a-zA-Z0-9\u00A0-\uFFFF]*$/u.test(String(value || ''));
+  }
+
+  normalizeClassList(rawValue) {
+    const reserved = this.editorOnlyClasses;
+    const classes = [];
+    const invalid = [];
+    const blocked = [];
+    String(rawValue || '')
+      .replace(/,/g, ' ')
+      .split(/\s+/)
+      .map(value => value.trim().replace(/^\.+/, ''))
+      .filter(Boolean)
+      .forEach(className => {
+        if (!this.isValidIdentityToken(className) || className.length > 128) invalid.push(className);
+        else if (reserved.has(className)) blocked.push(className);
+        else if (!classes.includes(className)) classes.push(className);
+      });
+    if (classes.length > 64) invalid.push('أكثر من 64 كلاس');
+    return { classes, invalid, blocked };
+  }
+
+  validateIdentityDraft(rawId, rawClasses, element = this.selectedElement) {
+    if (!element || !this.app.canvas.contains(element)) {
+      return { valid: false, error: 'اختر عنصراً داخل المعاينة أولاً.', id: '', classes: [] };
+    }
+    const id = String(rawId || '').trim().replace(/^#/, '');
+    if (!id) return { valid: false, error: 'لا يمكن ترك ID فارغاً لأن التنسيق والتفاعل يعتمدان عليه.', id, classes: [] };
+    if (id.length > 128 || !this.isValidElementId(id)) {
+      return { valid: false, error: 'ID غير صالح: ابدأ بحرف واستخدم الحروف والأرقام والشرطة والشرطة السفلية فقط.', id, classes: [] };
+    }
+    const duplicate = document.getElementById(id);
+    if (duplicate && duplicate !== element) {
+      return { valid: false, error: `المعرّف #${id} مستخدم بالفعل. اختر اسماً فريداً.`, id, classes: [] };
+    }
+    const normalized = this.normalizeClassList(rawClasses);
+    if (normalized.blocked.length) {
+      return { valid: false, error: `هذه كلاسات داخلية للمحرر ولا يمكن استخدامها: ${normalized.blocked.join('، ')}`, id, classes: normalized.classes };
+    }
+    if (normalized.invalid.length) {
+      return { valid: false, error: `كلاس غير صالح: ${normalized.invalid.join('، ')}`, id, classes: normalized.classes };
+    }
+    return { valid: true, error: '', id, classes: normalized.classes };
+  }
+
+  setIdentityEditorError(message = '') {
+    const error = this.identityEditor && this.identityEditor.querySelector('#element-identity-error');
+    if (!error) return;
+    error.textContent = message;
+    error.hidden = !message;
+    this.identityEditor.classList.toggle('has-error', !!message);
+  }
+
+  validateIdentityEditorDraft() {
+    if (!this.identityEditor) return false;
+    const idInput = this.identityEditor.querySelector('#element-id-input');
+    const classInput = this.identityEditor.querySelector('#element-class-input');
+    const button = this.identityEditor.querySelector('#element-identity-apply');
+    const validation = this.validateIdentityDraft(idInput ? idInput.value : '', classInput ? classInput.value : '');
+    const currentClasses = this.getUserClasses();
+    const changed = validation.valid && (
+      validation.id !== (this.selectedElement && this.selectedElement.id || '') ||
+      validation.classes.join(' ') !== currentClasses.join(' ')
+    );
+    this.setIdentityEditorError(validation.valid ? '' : validation.error);
+    if (button) button.disabled = !changed;
+    return validation.valid;
+  }
+
+  renderElementIdentityEditor(element) {
+    if (!this.identityEditor) return;
+    const hasElement = !!(element && this.app.canvas.contains(element));
+    const idInput = this.identityEditor.querySelector('#element-id-input');
+    const classInput = this.identityEditor.querySelector('#element-class-input');
+    const applyButton = this.identityEditor.querySelector('#element-identity-apply');
+    const resetButton = this.identityEditor.querySelector('#element-identity-reset');
+    const tag = this.identityEditor.querySelector('#element-identity-tag');
+    const status = this.identityEditor.querySelector('#element-identity-status');
+    this.identityEditor.classList.toggle('is-empty', !hasElement);
+    [idInput, classInput, resetButton].forEach(control => { if (control) control.disabled = !hasElement; });
+    if (applyButton) applyButton.disabled = true;
+    if (tag) tag.textContent = hasElement ? `<${element.tagName.toLowerCase()}>` : '—';
+    if (idInput) idInput.value = hasElement ? (element.id || '') : '';
+    if (classInput) classInput.value = hasElement ? this.getUserClasses(element).join(' ') : '';
+    if (status) status.textContent = '';
+    this.setIdentityEditorError('');
+  }
+
+  inferClassRenames(oldClasses, newClasses) {
+    const removed = oldClasses.filter(className => !newClasses.includes(className));
+    const added = newClasses.filter(className => !oldClasses.includes(className));
+    if (!removed.length || removed.length !== added.length) return [];
+    return removed.map((oldClass, index) => ({ oldClass, newClass: added[index] }));
+  }
+
+  updateCanvasIdReferences(oldId, newId) {
+    const changes = [];
+    if (!oldId || !newId || oldId === newId) return changes;
+    const tokenAttributes = new Set([
+      'aria-controls', 'aria-describedby', 'aria-details', 'aria-errormessage',
+      'aria-flowto', 'aria-labelledby', 'aria-owns', 'headers'
+    ]);
+    const singleAttributes = new Set(['for', 'form', 'list', 'aria-activedescendant']);
+    const selectorAttributes = new Set(['data-target', 'data-bs-target', 'data-controls']);
+    const fragmentAttributes = new Set(['href', 'xlink:href']);
+    const urlAttributes = new Set(['fill', 'clip-path', 'mask', 'filter']);
+
+    this.app.canvas.querySelectorAll('*').forEach(node => {
+      Array.from(node.attributes || []).forEach(attribute => {
+        const name = attribute.name.toLowerCase();
+        const previous = attribute.value;
+        let next = previous;
+        if (singleAttributes.has(name) && previous === oldId) next = newId;
+        else if (tokenAttributes.has(name)) {
+          next = previous.split(/\s+/).map(token => token === oldId ? newId : token).join(' ');
+        } else if (fragmentAttributes.has(name) && previous === `#${oldId}`) next = `#${newId}`;
+        else if (selectorAttributes.has(name) && this.app.styleEngine) {
+          next = this.app.styleEngine.rewriteSelectorReferences(previous, { oldId, newId });
+        } else if (urlAttributes.has(name) || name === 'style') {
+          const pattern = new RegExp(`url\\(\\s*(['"]?)#${this.app.editor.regexEscape(oldId)}\\1\\s*\\)`, 'g');
+          next = previous.replace(pattern, match => match.replace(`#${oldId}`, `#${newId}`));
+        }
+        if (next === previous) return;
+        changes.push({ node, name: attribute.name, previous });
+        node.setAttribute(attribute.name, next);
+      });
+    });
+    return changes;
+  }
+
+  applyIdentityEditorDraft() {
+    if (!this.identityEditor) return false;
+    const idInput = this.identityEditor.querySelector('#element-id-input');
+    const classInput = this.identityEditor.querySelector('#element-class-input');
+    const result = this.applyElementIdentity(idInput ? idInput.value : '', classInput ? classInput.value : '');
+    if (!result.ok) {
+      this.setIdentityEditorError(result.error || 'تعذر تطبيق الهوية.');
+      if (idInput && /ID|المعرّف/.test(result.error || '')) idInput.focus();
+      return false;
+    }
+    return true;
+  }
+
+  applyElementIdentity(rawId, rawClasses) {
+    const element = this.selectedElement;
+    const validation = this.validateIdentityDraft(rawId, rawClasses, element);
+    if (!validation.valid) return { ok: false, error: validation.error };
+
+    const oldId = element.id;
+    const oldClasses = this.getUserClasses(element);
+    const newId = validation.id;
+    const newClasses = validation.classes;
+    const classRenames = this.inferClassRenames(oldClasses, newClasses);
+    const changed = oldId !== newId || oldClasses.join(' ') !== newClasses.join(' ');
+    if (!changed) return { ok: true, changed: false, oldId, newId, classRenames: [] };
+
+    /* Guarantee that Undo returns to the exact HTML/CSS/JS triplet that was on
+       screen, even when another editor had a debounced save still pending. */
+    if (this.app.history && this.app.history.debounceTimeout) {
+      clearTimeout(this.app.history.debounceTimeout);
+      this.app.history.debounceTimeout = null;
+    }
+    this.app.history.saveState('قبل تغيير هوية العنصر');
+
+    const preserveOldClasses = classRenames
+      .filter(rename => Array.from(this.app.canvas.getElementsByClassName(rename.oldClass)).some(node => node !== element))
+      .map(rename => rename.oldClass);
+    const options = { oldId, newId, classRenames, preserveOldClasses };
+    const snapshot = {
+      id: element.getAttribute('id'),
+      className: element.getAttribute('class'),
+      css: this.app.editor.customCSS,
+      js: this.app.editor.customJS,
+      rules: JSON.parse(JSON.stringify(this.app.styleEngine.rules || {})),
+      activeSelector: this.app.styleEngine.activeSelector
+    };
+    let domReferenceChanges = [];
+
+    try {
+      const transientClasses = Array.from(element.classList).filter(className => this.editorOnlyClasses.has(className));
+      element.id = newId;
+      const finalClasses = [...newClasses, ...transientClasses.filter(className => !newClasses.includes(className))];
+      if (finalClasses.length) element.setAttribute('class', finalClasses.join(' '));
+      else element.removeAttribute('class');
+
+      domReferenceChanges = this.updateCanvasIdReferences(oldId, newId);
+      this.app.styleEngine.renameElementReferences(options, true);
+      this.app.editor.renameElementReferences(options);
+      this.app.styleEngine.setContext({
+        breakpoint: this.activeBreakpoint,
+        pseudo: this.currentPseudoState,
+        element
+      });
+
+      this.app.syncAll();
+      this.app.history.saveState('تغيير هوية العنصر');
+      this.app.saveProgress(false);
+      this.app.updateBreadcrumbs(element);
+      this.app.updateHighlighter();
+      this.updatePanelFor(element);
+      if (this.app.editor && typeof this.app.editor.updateInteractiveLinker === 'function') {
+        this.app.editor.updateInteractiveLinker();
+      }
+      this.renderElementIdentityEditor(element);
+      const status = this.identityEditor && this.identityEditor.querySelector('#element-identity-status');
+      if (status) {
+        const summary = [];
+        if (oldId !== newId) summary.push('ID');
+        if (classRenames.length) summary.push(`${classRenames.length} كلاس`);
+        status.textContent = `تم تحديث ${summary.join(' و') || 'الهوية'}`;
+      }
+      this.app.showToastNotice(`تم تغيير هوية العنصر إلى #${newId}`);
+      return {
+        ok: true,
+        changed: true,
+        oldId,
+        newId,
+        classRenames,
+        preservedSharedClasses: preserveOldClasses,
+        domReferencesUpdated: domReferenceChanges.length
+      };
+    } catch (error) {
+      if (snapshot.id === null) element.removeAttribute('id');
+      else element.setAttribute('id', snapshot.id);
+      if (snapshot.className === null) element.removeAttribute('class');
+      else element.setAttribute('class', snapshot.className);
+      domReferenceChanges.reverse().forEach(change => change.node.setAttribute(change.name, change.previous));
+      this.app.editor.customCSS = snapshot.css;
+      this.app.editor.customJS = snapshot.js;
+      this.app.styleEngine.rules = snapshot.rules;
+      this.app.styleEngine.activeSelector = snapshot.activeSelector;
+      this.app.styleEngine.commitToEditor();
+      this.app.editor.refreshEditorContent();
+      this.app.domTree.render();
+      console.error('تعذر تغيير هوية العنصر؛ تم التراجع عن المعاملة.', error);
+      return { ok: false, error: 'تعذر تطبيق التغيير بأمان؛ لم يتم حفظ أي تعديل.' };
+    }
   }
 
   getImportantState() {
@@ -1912,6 +2227,7 @@ class PropertiesManager {
     this.renderBreakpointsUI();
     
     if (!element) {
+      this.renderElementIdentityEditor(null);
       this.currentPseudoState = 'normal';
       if (this.app.styleEngine) this.app.styleEngine.setContext({ pseudo: 'normal', element: null });
       this.selectorDisplay.textContent = 'لا يوجد عنصر محدد';
@@ -1979,6 +2295,7 @@ class PropertiesManager {
       }
     }
     this.selectorDisplay.textContent = selector + this.app.styleEngine.pseudoSuffix(this.currentPseudoState);
+    this.renderElementIdentityEditor(element);
 
     // Get computed styles
     const computed = window.getComputedStyle(element);
