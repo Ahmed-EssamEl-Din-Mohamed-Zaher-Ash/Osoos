@@ -251,7 +251,16 @@ class CodeEditorManager {
   }
 
   // Load content into the textarea based on the selected language tab
-  refreshEditorContent() {
+  refreshEditorContent(options = {}) {
+    const preserveSelection = options.preserveSelection === true &&
+      document.activeElement === this.textarea;
+    const editorState = options.selectionState || (preserveSelection ? {
+      start: this.textarea.selectionStart,
+      end: this.textarea.selectionEnd,
+      direction: this.textarea.selectionDirection,
+      scrollTop: this.textarea.scrollTop,
+      scrollLeft: this.textarea.scrollLeft
+    } : null);
     const projectFile = this.app.projectManager && typeof this.app.projectManager.getActiveEditableFile === 'function'
       ? this.app.projectManager.getActiveEditableFile()
       : null;
@@ -260,6 +269,7 @@ class CodeEditorManager {
       if (this.currentLanguage === projectLanguage) {
         this.textarea.value = projectFile.content || '';
         this.updateLineNumbers();
+        this.restoreEditorState(editorState);
         return;
       }
     }
@@ -271,6 +281,21 @@ class CodeEditorManager {
       this.textarea.value = this.formatJS(this.customJS || '');
     }
     this.updateLineNumbers();
+    this.restoreEditorState(editorState);
+  }
+
+  restoreEditorState(state) {
+    if (!state) return;
+    const length = this.textarea.value.length;
+    const start = Math.min(Math.max(0, state.start), length);
+    const end = Math.min(Math.max(start, state.end), length);
+    try {
+      this.textarea.setSelectionRange(start, end, state.direction || 'none');
+    } catch { /* Selection restoration is cosmetic; keep the synced content. */ }
+    this.textarea.scrollTop = state.scrollTop;
+    this.textarea.scrollLeft = state.scrollLeft;
+    this.lastSelectionStart = start;
+    this.lastSelectionEnd = end;
   }
 
   // Bidirectional editing: edit textarea -> update workspace canvas
@@ -296,6 +321,15 @@ class CodeEditorManager {
 
   syncEditorToCanvas() {
     const value = this.textarea.value;
+    // Capture before rebuilding the canvas: selection changes and panel
+    // refreshes during the sync must not move a typing caret to the end.
+    const editorSelectionState = document.activeElement === this.textarea ? {
+      start: this.textarea.selectionStart,
+      end: this.textarea.selectionEnd,
+      direction: this.textarea.selectionDirection,
+      scrollTop: this.textarea.scrollTop,
+      scrollLeft: this.textarea.scrollLeft
+    } : null;
 
     if (this.app.projectManager &&
         typeof this.app.projectManager.syncActiveExternalFile === 'function' &&
@@ -336,7 +370,10 @@ class CodeEditorManager {
 
         this.app.selectElement(null);
         this.app.reattachCanvasListeners();
-        this.app.syncDOMTree();
+        this.app.syncDOMTree({
+          preserveEditorSelection: true,
+          editorSelectionState
+        });
         if (typeof this.app.refreshInteractionUIAfterStructureCleanup === 'function') {
           this.app.refreshInteractionUIAfterStructureCleanup();
         }

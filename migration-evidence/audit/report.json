@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T11:49:55.714Z",
+  "generatedAt": "2026-07-26T15:46:47.771Z",
   "result": "pass",
   "checks": {
     "originalIdsPreserved": true,
@@ -12,7 +12,7 @@
   },
   "counts": {
     "vanillaIds": 237,
-    "reactIds": 237,
+    "reactIds": 238,
     "vanillaCssFiles": 17,
     "productionScripts": 1,
     "preApplicationModules": 3,
@@ -112,7 +112,7 @@
     {
       "type": "module",
       "crossorigin": "",
-      "src": "./assets/index-DmRkcjyq.js"
+      "src": "./assets/index-DT04PrAf.js"
     }
   ],
   "versions": {

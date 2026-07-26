@@ -44,7 +44,7 @@ describe('React application shell', () => {
     const { container } = renderShell();
     const ids = [...container.querySelectorAll('[id]')].map(node => node.id);
 
-    expect(ids.length).toBe(237);
+    expect(ids.length).toBe(238);
     expect(new Set(ids).size).toBe(ids.length);
   });
 });

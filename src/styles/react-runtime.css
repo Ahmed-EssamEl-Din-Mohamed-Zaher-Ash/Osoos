@@ -11,3 +11,44 @@ html[data-react-migration-ready='error'] #root,
 html[data-react-migration-ready='true'] #root {
   visibility: visible;
 }
+
+/*
+ * The icon picker uses the native hidden attribute when it closes. The legacy
+ * author rule sets display:flex, which otherwise wins over the browser's
+ * default [hidden] rule and leaves the dialog visible.
+ */
+.icon-picker-overlay[hidden] {
+  display: none;
+}
+
+/*
+ * Flex item controls edit one canonical `flex` value. Stack labels above their
+ * fields in the narrow inspector so the shorthand and its parts never overlap.
+ */
+.flex-item-controls .flex-shorthand-field,
+.flex-item-controls .flex-order-field {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.flex-item-controls .flex-shorthand-field > span,
+.flex-item-controls .flex-order-field > span,
+.flex-item-controls .compact-field-grid-3 label > span {
+  direction: ltr;
+  text-align: left;
+}
+
+.flex-item-controls .flex-shorthand-field .css-prop-field,
+.flex-item-controls .flex-order-field .css-prop-field {
+  width: 100%;
+}
+
+.flex-item-controls .compact-field-grid-3 {
+  grid-template-columns: repeat(3, minmax(62px, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .flex-item-controls .compact-field-grid-3 {
+    grid-template-columns: repeat(3, minmax(58px, 1fr));
+  }
+}

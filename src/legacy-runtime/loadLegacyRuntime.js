@@ -29,7 +29,11 @@ async function waitForApplication() {
     }
     await new Promise(resolve => setTimeout(resolve, 25));
   }
-  return window.appInstance;
+  const app = window.appInstance;
+  if (app.projectManager.readyPromise) {
+    await app.projectManager.readyPromise;
+  }
+  return app;
 }
 
 async function initializeRuntime() {
