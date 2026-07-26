@@ -1,0 +1,285 @@
+/*
+ * Osoos experience modes
+ *
+ * This stylesheet is loaded by js/beginner-mode.js so the feature can stay
+ * isolated from the main application layout and component styles.
+ */
+
+#beginner-mode-toggle {
+  min-width: 132px;
+  justify-content: center;
+  gap: 7px;
+  border-color: color-mix(in srgb, var(--accent-orange) 45%, var(--border-color));
+  white-space: nowrap;
+}
+
+#beginner-mode-toggle .beginner-mode-toggle-icon {
+  width: 15px;
+  text-align: center;
+}
+
+#beginner-mode-toggle[data-mode="beginner"] {
+  color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 10%, var(--bg-secondary));
+}
+
+#beginner-mode-toggle[data-mode="advanced"] {
+  color: var(--accent-blue);
+  border-color: color-mix(in srgb, var(--accent-blue) 45%, var(--border-color));
+  background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary));
+}
+
+/* Keep Code mode intact: the bottom panel is hidden only in Designer mode. */
+body.osoos-beginner-mode .center-workspace.mode-designer {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+body.osoos-beginner-mode .center-workspace.mode-designer .bottom-panel {
+  display: none !important;
+}
+
+body.osoos-beginner-mode #left-panel-count,
+body.osoos-beginner-mode .beginner-advanced-control {
+  display: none !important;
+}
+
+body.osoos-beginner-mode #css-properties-container {
+  gap: 6px !important;
+}
+
+body.osoos-beginner-mode #css-properties-container > .accordion {
+  margin: 0;
+  border-radius: var(--radius-md);
+}
+
+body.osoos-beginner-mode #css-properties-container .accordion-summary {
+  min-height: 40px;
+  padding-block: 9px;
+  line-height: 1.45;
+}
+
+.beginner-advanced-badge {
+  display: none;
+  align-items: center;
+  margin-inline-start: auto;
+  margin-inline-end: 7px;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 45%, transparent);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1.7;
+  vertical-align: middle;
+}
+
+body.osoos-beginner-mode .beginner-advanced-badge {
+  display: inline-flex;
+}
+
+body.osoos-beginner-mode .beginner-advanced-accordion:not(.open) {
+  border-color: color-mix(in srgb, var(--border-color) 75%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 88%, var(--bg-primary));
+}
+
+body.osoos-beginner-mode .beginner-advanced-accordion:not(.open) .accordion-summary {
+  color: var(--text-muted);
+}
+
+/* Ready-made components, shown before the regular HTML element catalogue. */
+.beginner-components-panel {
+  display: none;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-orange) 32%, var(--border-color));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent-orange) 8%, transparent), transparent 58%),
+    var(--bg-tertiary);
+}
+
+body.osoos-beginner-mode .beginner-components-panel {
+  display: block;
+}
+
+.beginner-components-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.beginner-components-heading > i {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 14%, transparent);
+}
+
+.beginner-components-title {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.beginner-components-description {
+  display: block;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.beginner-components-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.ready-component-card {
+  display: flex;
+  min-width: 0;
+  min-height: 76px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  text-align: right;
+  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.ready-component-card:hover {
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 7%, var(--bg-secondary));
+  transform: translateY(-1px);
+}
+
+.ready-component-card:focus-visible {
+  outline: 2px solid var(--accent-orange);
+  outline-offset: 2px;
+}
+
+.ready-component-card-icon {
+  color: var(--accent-orange);
+  font-size: 14px;
+}
+
+.ready-component-card-title {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.ready-component-card-description {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.beginner-components-status {
+  min-height: 16px;
+  margin: 9px 1px 0;
+  color: var(--text-muted);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.beginner-components-status[data-status="success"] {
+  color: var(--accent-green);
+}
+
+.beginner-components-status[data-status="error"] {
+  color: var(--accent-red);
+}
+
+.beginner-html-details {
+  margin: 0;
+}
+
+.beginner-html-details > summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.beginner-html-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.beginner-html-details > summary::after {
+  content: "\f078";
+  font-family: "Font Awesome 6 Free";
+  font-size: 9px;
+  font-weight: 900;
+  transition: transform 0.16s ease;
+}
+
+.beginner-html-details[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.beginner-html-details > summary:focus-visible {
+  outline: 2px solid var(--accent-orange);
+  outline-offset: 2px;
+}
+
+.beginner-html-details-body {
+  padding-top: 12px;
+}
+
+body.osoos-advanced-mode .beginner-components-panel {
+  display: none;
+}
+
+/* In advanced mode, restore the catalogue to its original flat layout. */
+body.osoos-advanced-mode .beginner-html-details,
+body.osoos-advanced-mode .beginner-html-details-body {
+  display: contents;
+}
+
+body.osoos-advanced-mode .beginner-html-details > summary {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  #beginner-mode-toggle {
+    min-width: 38px;
+    padding-inline: 10px;
+  }
+
+  #beginner-mode-toggle .beginner-mode-toggle-label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ready-component-card,
+  .beginner-html-details > summary::after {
+    transition: none;
+  }
+}

@@ -1,0 +1,1341 @@
+/*
+ * Interaction Hub
+ * Beginner-friendly interaction catalogue and three-step builder.
+ */
+
+#js-interaction-hub.interaction-hub,
+.ih-overlay,
+.ih-dialog {
+  box-sizing: border-box;
+  font-family: var(--font-main);
+}
+
+#js-interaction-hub.interaction-hub *,
+.ih-overlay *,
+.ih-dialog * {
+  box-sizing: border-box;
+}
+
+#js-interaction-hub.interaction-hub .sr-only,
+.ih-dialog .sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+#js-interaction-hub.interaction-hub {
+  --ih-control-height: 32px;
+  --ih-card-background: var(--bg-tertiary);
+  --ih-focus-ring: var(--accent-orange);
+
+  direction: rtl;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.55;
+  scrollbar-color: var(--border-light) transparent;
+  scrollbar-width: thin;
+}
+
+#js-interaction-hub.interaction-hub[hidden],
+.ih-overlay[hidden],
+.ih-step-panel[hidden],
+.ih-advanced-panel[hidden] {
+  display: none !important;
+}
+
+#js-interaction-hub.interaction-hub button,
+#js-interaction-hub.interaction-hub input,
+#js-interaction-hub.interaction-hub select,
+#js-interaction-hub.interaction-hub textarea,
+.ih-dialog button,
+.ih-dialog input,
+.ih-dialog select,
+.ih-dialog textarea {
+  max-width: 100%;
+  font: inherit;
+}
+
+#js-interaction-hub.interaction-hub :where(button, .btn, input, select, summary),
+.ih-dialog :where(button, .btn, input, select, summary) {
+  min-height: var(--ih-control-height, 32px);
+}
+
+#js-interaction-hub.interaction-hub :where(
+  button,
+  .btn,
+  input,
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex="-1"]),
+  [role="button"]
+):focus-visible,
+.ih-dialog :where(
+  button,
+  .btn,
+  input,
+  select,
+  textarea,
+  summary,
+  [tabindex]:not([tabindex="-1"]),
+  [role="button"]
+):focus-visible {
+  outline: 3px solid var(--ih-focus-ring, var(--accent-orange));
+  outline-offset: 2px;
+  border-color: var(--accent-orange);
+  box-shadow: none;
+}
+
+.ih-intro {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  min-width: 0;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid rgba(var(--accent-orange-rgb), 0.38);
+  border-radius: var(--radius-md);
+  background: rgba(var(--accent-orange-rgb), 0.08);
+}
+
+.ih-intro-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(var(--accent-orange-rgb), 0.42);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--accent-orange);
+  font-size: 14px;
+}
+
+.ih-intro-copy {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.ih-intro-copy :where(h2, h3, strong) {
+  display: block;
+  margin: 0 0 2px;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ih-intro-copy :where(p, small) {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.ih-search {
+  position: relative;
+  display: block;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.ih-search > i {
+  position: absolute;
+  inset-inline-start: 10px;
+  top: 50%;
+  z-index: 1;
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.ih-search :where(input, .js-linker-input) {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 6px 31px 6px 9px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-main);
+  direction: rtl;
+  text-align: right;
+  font-size: 12px;
+}
+
+.ih-search :where(input, .js-linker-input)::placeholder {
+  color: var(--text-muted);
+  opacity: 0.88;
+}
+
+.ih-path-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  min-width: 0;
+}
+
+.ih-path-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--ih-card-background);
+  color: var(--text-main);
+  text-align: right;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.ih-path-card:hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.ih-path-card.primary {
+  border-color: rgba(var(--accent-orange-rgb), 0.58);
+  background: rgba(var(--accent-orange-rgb), 0.1);
+}
+
+.ih-path-card.primary:hover {
+  border-color: var(--accent-orange);
+  background: rgba(var(--accent-orange-rgb), 0.16);
+}
+
+.ih-path-card > i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--accent-orange);
+}
+
+.ih-path-card :where(span, strong, small) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ih-path-card strong {
+  display: block;
+  font-size: 12px;
+}
+
+.ih-path-card small {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.ih-section {
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.ih-section + .ih-section {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.ih-section-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  margin-bottom: 7px;
+}
+
+.ih-section-head :where(h2, h3, strong) {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ih-filter-count {
+  flex: 0 0 auto;
+  min-width: 24px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.ih-template-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.ih-template-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-areas:
+    "icon copy"
+    "icon meta";
+  gap: 2px 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--ih-card-background);
+  color: var(--text-main);
+  text-align: right;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.ih-template-card:hover {
+  border-color: rgba(var(--accent-orange-rgb), 0.56);
+  background: var(--bg-hover);
+}
+
+.ih-template-icon {
+  grid-area: icon;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--accent-orange);
+  font-size: 13px;
+}
+
+.ih-template-copy {
+  grid-area: copy;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ih-template-copy :where(strong, b) {
+  display: block;
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ih-template-copy :where(p, small) {
+  display: block;
+  margin: 1px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ih-template-meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.ih-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.ih-kind-badge[data-kind="modern"],
+.ih-kind-badge.modern {
+  border-color: rgba(16, 185, 129, 0.42);
+  color: var(--accent-green);
+}
+
+.ih-kind-badge[data-kind="component"],
+.ih-kind-badge.component {
+  border-color: rgba(59, 130, 246, 0.42);
+  color: var(--accent-blue);
+}
+
+.ih-kind-badge[data-kind="legacy"],
+.ih-kind-badge.legacy {
+  border-color: rgba(var(--accent-orange-rgb), 0.48);
+  color: var(--accent-orange);
+}
+
+.ih-saved-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ih-saved-item {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--ih-card-background);
+}
+
+.ih-saved-main {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  text-align: right;
+}
+
+.ih-saved-main > i {
+  flex: 0 0 auto;
+  color: var(--accent-orange);
+}
+
+.ih-saved-main :where(span, strong, small) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ih-saved-main strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 11px;
+}
+
+.ih-saved-main small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.ih-saved-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  align-items: center;
+}
+
+.ih-saved-actions :where(button, .btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.ih-saved-actions :where(button, .btn):hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.ih-empty {
+  min-width: 0;
+  padding: 14px 10px;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.ih-empty > i {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent-orange);
+  font-size: 16px;
+}
+
+.ih-advanced {
+  min-width: 0;
+  margin-top: 14px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+
+.ih-advanced > summary {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ih-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ih-advanced > summary:hover {
+  border-color: var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-main);
+}
+
+.ih-advanced > summary::after {
+  content: "\f078";
+  flex: 0 0 auto;
+  color: var(--accent-orange);
+  font-family: "Font Awesome 6 Free", "Font Awesome 5 Free";
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.ih-advanced[open] > summary::after {
+  content: "\f077";
+}
+
+.ih-advanced-panel {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 7px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.ih-advanced-panel :where(.btn, button) {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: right;
+}
+
+/* Three-step interaction builder */
+.ih-overlay {
+  --ih-control-height: 32px;
+  --ih-focus-ring: var(--accent-orange);
+
+  position: fixed;
+  inset: 0;
+  z-index: 22000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.72);
+  direction: rtl;
+}
+
+.ih-dialog {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(900px, 96vw);
+  max-width: 900px;
+  height: auto;
+  max-height: 94vh;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-top: 3px solid var(--accent-orange);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text-main);
+  box-shadow: var(--shadow-lg);
+  direction: rtl;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ih-dialog-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 14px 16px 11px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.ih-dialog-header > :first-child {
+  min-width: 0;
+}
+
+.ih-dialog-header > :where(button, .btn) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.ih-dialog-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ih-dialog-title > i {
+  flex: 0 0 auto;
+  color: var(--accent-orange);
+}
+
+.ih-source-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  align-items: center;
+  min-width: 0;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.ih-source-context :where(code, .ih-kind-badge) {
+  max-width: 100%;
+}
+
+.ih-source-context code {
+  overflow: hidden;
+  padding: 1px 5px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--accent-orange);
+  direction: ltr;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interaction-hub > .ih-source-context {
+  margin: 0 0 10px;
+}
+
+.ih-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+/* الجملة الحية: ملخص التفاعل بالعربي أعلى المعالج، يتحدّث أثناء الكتابة */
+.ih-live-summary {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgb(59 130 246 / 7%);
+  color: var(--text-main);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.ih-live-summary > i {
+  margin-top: 3px;
+  color: #60a5fa;
+  font-size: 12px;
+}
+
+.ih-action-value-source {
+  margin-bottom: 6px;
+}
+
+.ih-field-note {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 2px;
+  color: #93c5fd;
+  font-size: 11px;
+}
+
+.ih-step-tab {
+  position: relative;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 8px;
+  border: 0;
+  border-inline-end: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.ih-step-tab:first-child {
+  border-inline-end: 0;
+}
+
+.ih-step-tab > :where(span, strong) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ih-step-tab > i,
+.ih-step-tab > .ih-step-number {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 23px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  background: var(--bg-secondary);
+  color: inherit;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.ih-step-tab:hover {
+  color: var(--text-main);
+}
+
+.ih-step-tab.active,
+.ih-step-tab[aria-selected="true"],
+.ih-step-tab[aria-current="step"] {
+  color: var(--accent-orange);
+}
+
+.ih-step-tab.active > i,
+.ih-step-tab.active > .ih-step-number,
+.ih-step-tab[aria-selected="true"] > i,
+.ih-step-tab[aria-selected="true"] > .ih-step-number,
+.ih-step-tab[aria-current="step"] > i,
+.ih-step-tab[aria-current="step"] > .ih-step-number {
+  border-color: var(--accent-orange);
+  background: rgba(var(--accent-orange-rgb), 0.13);
+  color: var(--accent-orange);
+}
+
+.ih-dialog-body {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--bg-secondary);
+  overscroll-behavior: contain;
+  scrollbar-color: var(--border-light) transparent;
+  scrollbar-width: thin;
+}
+
+.ih-step-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+  align-content: start;
+}
+
+.ih-step-panel > :where(h2, h3, .ih-summary, .ih-validation, .ih-inline-actions, .ih-expand-card) {
+  grid-column: 1 / -1;
+}
+
+.ih-step-panel > :where(h2, h3) {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 15px;
+}
+
+.ih-step-panel > p {
+  grid-column: 1 / -1;
+  margin: -5px 0 1px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ih-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ih-field > :where(label, .ih-field-label) {
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ih-field > small,
+.ih-field > .ih-help {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ih-field :where(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea,
+  .js-linker-input,
+  .js-linker-select,
+  .vl-field
+) {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-main);
+  direction: rtl;
+  text-align: right;
+  font-size: 12px;
+}
+
+.ih-field textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.ih-field :where(input, textarea)::placeholder {
+  color: var(--text-muted);
+  opacity: 0.82;
+}
+
+.ih-field :where(input, select, textarea)[aria-invalid="true"],
+.ih-field.has-error :where(input, select, textarea, .js-linker-input, .js-linker-select) {
+  border-color: var(--accent-red);
+}
+
+.ih-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-column: 1 / -1;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ih-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-column: 1 / -1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ih-choice {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-main);
+  text-align: right;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.ih-choice:hover {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.ih-choice > i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+}
+
+.ih-choice :where(strong, span, small) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ih-choice strong {
+  display: block;
+  font-size: 12px;
+}
+
+.ih-choice small {
+  display: block;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.ih-choice.active,
+.ih-choice[aria-checked="true"],
+.ih-choice[aria-pressed="true"] {
+  border-color: var(--accent-orange);
+  background: rgba(var(--accent-orange-rgb), 0.1);
+}
+
+.ih-choice.active > i,
+.ih-choice[aria-checked="true"] > i,
+.ih-choice[aria-pressed="true"] > i {
+  border-color: rgba(var(--accent-orange-rgb), 0.5);
+  color: var(--accent-orange);
+}
+
+.ih-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+}
+
+.ih-inline-actions :where(button, .btn) {
+  min-height: 32px;
+}
+
+.ih-expand-card {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.ih-expand-card > summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  color: var(--text-main);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ih-expand-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ih-expand-card > summary::after {
+  content: "\f078";
+  margin-inline-start: auto;
+  color: var(--accent-orange);
+  font-family: "Font Awesome 6 Free", "Font Awesome 5 Free";
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.ih-expand-card[open] > summary::after {
+  content: "\f077";
+}
+
+.ih-expand-card > :not(summary) {
+  margin: 0 10px 10px;
+}
+
+.ih-summary {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(var(--accent-orange-rgb), 0.38);
+  border-radius: var(--radius-md);
+  background: rgba(var(--accent-orange-rgb), 0.07);
+  color: var(--text-main);
+}
+
+.ih-summary :where(h3, strong) {
+  margin: 0;
+  color: var(--accent-orange);
+  font-size: 13px;
+}
+
+.ih-summary :where(p, ul, ol) {
+  margin: 0;
+}
+
+.ih-summary :where(ul, ol) {
+  padding-inline-start: 20px;
+}
+
+.ih-summary :where(code, kbd) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 2px 5px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-main);
+  direction: ltr;
+  font-size: 11px;
+}
+
+.ih-validation {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(239, 68, 68, 0.46);
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.ih-validation[data-state="success"],
+.ih-validation.success {
+  border-color: rgba(16, 185, 129, 0.44);
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--accent-green);
+}
+
+.ih-validation[data-state="warning"],
+.ih-validation.warning {
+  border-color: rgba(var(--accent-orange-rgb), 0.44);
+  background: rgba(var(--accent-orange-rgb), 0.08);
+  color: var(--accent-orange);
+}
+
+.ih-validation:empty {
+  display: none;
+}
+
+.ih-dialog-footer {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.ih-dialog-footer :where(button, .btn) {
+  min-height: 34px;
+}
+
+.ih-dialog-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+/* Keep legacy fields visually consistent when shown inside Advanced tools. */
+#js-interaction-hub.interaction-hub :where(.js-linker-select, .js-linker-input, .vl-field),
+.ih-dialog :where(.js-linker-select, .js-linker-input, .vl-field) {
+  border-color: var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-main);
+}
+
+#js-interaction-hub.interaction-hub :where(.vl-popup-footer, .vl-popup-header),
+.ih-dialog :where(.vl-popup-footer, .vl-popup-header) {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .ih-overlay {
+    padding: 8px;
+  }
+
+  .ih-dialog {
+    width: min(100%, 680px);
+    max-height: 96vh;
+  }
+
+  .ih-dialog-header {
+    padding: 11px 12px 9px;
+  }
+
+  .ih-stepper {
+    padding: 6px 10px;
+  }
+
+  .ih-step-tab {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 49px;
+    padding: 4px;
+    font-size: 10px;
+  }
+
+  .ih-dialog-body {
+    padding: 12px;
+  }
+
+  .ih-step-panel,
+  .ih-field-row,
+  .ih-choice-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ih-dialog-footer {
+    flex-wrap: wrap;
+    padding: 9px 12px;
+  }
+
+  .ih-dialog-spacer {
+    display: none;
+  }
+
+  .ih-dialog-footer :where(button, .btn) {
+    flex: 1 1 120px;
+  }
+}
+
+@media (max-width: 430px) {
+  .ih-overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .ih-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-width: 0;
+    border-top: 3px solid var(--accent-orange);
+    border-radius: 0;
+  }
+
+  .ih-dialog-title {
+    font-size: 14px;
+  }
+
+  .ih-source-context {
+    font-size: 10px;
+  }
+
+  .ih-stepper {
+    padding: 5px 6px;
+  }
+
+  .ih-step-tab {
+    min-height: 46px;
+    font-size: 9px;
+  }
+
+  .ih-step-tab > i,
+  .ih-step-tab > .ih-step-number {
+    width: 21px;
+    height: 21px;
+  }
+
+  .ih-dialog-body {
+    padding: 10px;
+  }
+
+  .ih-choice {
+    min-height: 54px;
+  }
+
+  .ih-dialog-footer {
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .ih-dialog-footer :where(button, .btn) {
+    flex-basis: 90px;
+  }
+
+  #js-interaction-hub.interaction-hub :where(
+    button,
+    .btn,
+    input,
+    select,
+    summary,
+    [role="button"]
+  ),
+  .ih-dialog :where(
+    button,
+    .btn,
+    input,
+    select,
+    summary,
+    [role="button"]
+  ) {
+    min-height: 44px;
+  }
+
+  .ih-saved-actions :where(button, .btn),
+  .ih-dialog-header > :where(button, .btn) {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+@media (pointer: coarse) {
+  #js-interaction-hub.interaction-hub,
+  .ih-overlay {
+    --ih-control-height: 44px;
+  }
+
+  #js-interaction-hub.interaction-hub :where(
+    button,
+    .btn,
+    input,
+    select,
+    summary,
+    [role="button"]
+  ),
+  .ih-dialog :where(
+    button,
+    .btn,
+    input,
+    select,
+    summary,
+    [role="button"]
+  ) {
+    min-height: 44px;
+  }
+
+  .ih-saved-actions :where(button, .btn),
+  .ih-dialog-header > :where(button, .btn) {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #js-interaction-hub.interaction-hub *,
+  .ih-overlay *,
+  .ih-dialog * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  #js-interaction-hub.interaction-hub,
+  .ih-dialog {
+    forced-color-adjust: auto;
+  }
+
+  .ih-path-card.primary,
+  .ih-choice.active,
+  .ih-choice[aria-checked="true"],
+  .ih-choice[aria-pressed="true"],
+  .ih-summary {
+    border-color: Highlight;
+  }
+
+  #js-interaction-hub.interaction-hub :where(
+    button,
+    .btn,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]:not([tabindex="-1"]),
+    [role="button"]
+  ):focus-visible,
+  .ih-dialog :where(
+    button,
+    .btn,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]:not([tabindex="-1"]),
+    [role="button"]
+  ):focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+  }
+}

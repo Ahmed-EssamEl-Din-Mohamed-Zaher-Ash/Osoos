@@ -1,0 +1,176 @@
+/* DOM tree drag/drop and accessibility enhancements */
+
+.dom-tree-list {
+  position: relative;
+  min-height: 42px;
+}
+
+.dom-tree-node-wrapper {
+  position: relative;
+  gap: 6px;
+  border: 1px solid transparent;
+}
+
+.dom-node-left {
+  min-width: 0;
+  flex: 1;
+}
+
+.dom-node-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dom-drag-handle {
+  width: 16px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  border-radius: var(--radius-sm);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0.55;
+  transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.dom-tree-node-wrapper:hover .dom-drag-handle,
+.dom-drag-handle:focus-visible {
+  opacity: 1;
+  color: var(--accent-orange);
+  background-color: var(--bg-hover);
+  outline: 1px solid var(--accent-orange);
+  outline-offset: 1px;
+}
+
+.dom-tree-node-wrapper:focus-within .dom-node-actions {
+  display: flex;
+}
+
+.dom-tree-item[role="treeitem"]:focus-visible > .dom-tree-node-wrapper {
+  outline: 1px solid var(--accent-blue);
+  outline-offset: 1px;
+}
+
+.dom-drag-handle:active,
+.dom-tree-node-wrapper.is-dragging .dom-drag-handle {
+  cursor: grabbing;
+}
+
+.dom-node-toggle {
+  min-width: 12px;
+  width: 12px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+}
+
+button.dom-node-toggle:focus-visible,
+.dom-action-btn:focus-visible {
+  outline: 1px solid var(--accent-orange);
+  outline-offset: 1px;
+}
+
+.dom-node-toggle-placeholder {
+  cursor: default;
+}
+
+.dom-tree-node-wrapper.is-dragging {
+  opacity: 0.42;
+  background-color: var(--bg-tertiary);
+}
+
+.dom-tree-node-wrapper.is-drop-before::before,
+.dom-tree-node-wrapper.is-drop-after::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  border-radius: 999px;
+  background-color: var(--accent-orange);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2), 0 0 8px rgba(245, 158, 11, 0.45);
+  pointer-events: none;
+}
+
+.dom-tree-node-wrapper.is-drop-before::before {
+  top: -3px;
+}
+
+.dom-tree-node-wrapper.is-drop-after::after {
+  bottom: -3px;
+}
+
+.dom-tree-node-wrapper.is-drop-inside {
+  border-color: var(--accent-orange);
+  background-color: rgba(245, 158, 11, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+.dom-tree-node-wrapper.is-drop-invalid,
+.dom-tree-root-drop-zone.is-drop-invalid {
+  border-color: var(--accent-red);
+  background-color: rgba(239, 68, 68, 0.1);
+  cursor: not-allowed;
+}
+
+.dom-tree-root-drop-zone {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  margin: 8px 0 2px;
+  padding: 6px 8px;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.dom-tree-list.dom-tree-drag-session > .dom-tree-root-drop-zone {
+  display: flex;
+}
+
+.dom-tree-root-drop-zone.is-drop-root {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.dom-tree-children[hidden] {
+  display: none !important;
+}
+
+.dom-tree-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dom-drag-handle,
+  .dom-tree-root-drop-zone {
+    transition: none;
+  }
+}

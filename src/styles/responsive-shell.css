@@ -1,0 +1,683 @@
+/*
+ * Responsive editor shell
+ *
+ * Load this file after the existing editor stylesheets. It intentionally does
+ * not change the >= 1200px desktop layout. The rules below reuse the panel
+ * state maintained by js/responsive-shell.js (`body[data-responsive-panel]`)
+ * and keeps the existing js/app.js `collapsed` state as a safety guard.
+ */
+
+/* The controller creates these nodes at every viewport; desktop must ignore them. */
+.responsive-panel-nav,
+.responsive-panel-backdrop {
+  display: none;
+}
+
+/* Shared compact-shell controls created by js/responsive-shell.js. */
+@media (max-width: 1199.98px) {
+  body.responsive-shell-compact .responsive-panel-nav {
+    position: absolute;
+    right: 50%;
+    bottom: 10px;
+    z-index: 70;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(420px, calc(100% - 24px));
+    min-height: 56px;
+    padding: 4px;
+    overflow: hidden;
+    transform: translateX(50%);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-full);
+    background: var(--bg-secondary);
+    background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(12px);
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav button {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--text-muted);
+    font: 600 12px/1 var(--font-main);
+    cursor: pointer;
+    transition: color 160ms ease, background-color 160ms ease;
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav button:hover {
+    color: var(--text-main);
+    background: var(--bg-tertiary);
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav button.active,
+  body.responsive-shell-compact .responsive-panel-nav button[aria-pressed="true"] {
+    color: var(--text-dark);
+    background: var(--accent-orange);
+    box-shadow: var(--shadow-sm);
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav button i {
+    font-size: 14px;
+  }
+
+  body.responsive-shell-compact .responsive-panel-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgb(3 7 18 / 42%);
+    cursor: pointer;
+    backdrop-filter: blur(1px);
+  }
+
+  body.responsive-shell-compact .responsive-panel-backdrop[hidden] {
+    display: none !important;
+  }
+
+  body:not(.responsive-shell-compact) :is(
+    .responsive-panel-nav,
+    .responsive-panel-backdrop
+  ) {
+    display: none !important;
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav button:focus-visible,
+  body.responsive-shell-compact .responsive-panel-backdrop:focus-visible {
+    outline: 2px solid var(--accent-orange);
+    outline-offset: 2px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tablet / compact desktop: one overlay panel, canvas keeps the available width
+   -------------------------------------------------------------------------- */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  .app-container {
+    grid-template-rows: 64px minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  header.app-header {
+    min-width: 0;
+    gap: 8px;
+    padding-inline: 12px;
+    overflow: hidden;
+  }
+
+  header.app-header .header-right,
+  header.app-header .header-left,
+  header.app-header .header-actions {
+    min-width: 0;
+    gap: 6px !important;
+  }
+
+  header.app-header .header-left {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+
+  header.app-header .breadcrumb-badge,
+  header.app-header .checkbox-container,
+  header.app-header .project-title > span:last-child {
+    display: none !important;
+  }
+
+  header.app-header :is(
+    #project-manager-btn,
+    #header-undo,
+    #header-redo,
+    #export-btn,
+    #final-preview-btn,
+    #preview-toggle-btn,
+    #beginner-mode-toggle
+  ) {
+    flex: 0 0 40px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 !important;
+    font-size: 0;
+  }
+
+  header.app-header :is(
+    #project-manager-btn,
+    #header-undo,
+    #header-redo,
+    #export-btn,
+    #final-preview-btn,
+    #preview-toggle-btn,
+    #beginner-mode-toggle
+  ) i {
+    font-size: 13px;
+  }
+
+  header.app-header .viewport-btn {
+    min-width: 40px;
+    height: 36px;
+    padding-inline: 7px;
+  }
+
+  header.app-header .header-actions {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  header.app-header .header-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-workspace {
+    position: relative;
+    isolation: isolate;
+    grid-template-columns: 48px minmax(0, 1fr) !important;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-workspace > .thin-sidebar {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .app-workspace > .center-workspace {
+    grid-column: 2;
+    min-width: 0;
+    margin-bottom: 76px;
+  }
+
+  /* Side panels leave grid flow and become non-destructive overlays. */
+  .app-workspace > .side-panel {
+    position: absolute;
+    top: 8px;
+    bottom: 76px;
+    z-index: 40;
+    width: min(330px, calc(100% - 64px)) !important;
+    min-width: 0 !important;
+    max-width: calc(100% - 64px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    transition:
+      transform 180ms ease,
+      opacity 180ms ease,
+      visibility 180ms ease;
+    will-change: transform;
+  }
+
+  /* CSS/properties drawer is next to the persistent icon rail (physical right). */
+  .app-workspace > .panel-left {
+    right: 48px;
+    left: auto;
+    border-right: 1px solid var(--border-color);
+    transform: translateX(calc(100% + 48px));
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  body[data-responsive-panel="properties"] .app-workspace > .panel-left:not(.collapsed) {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .app-workspace > .panel-left.collapsed {
+    width: min(330px, calc(100% - 64px)) !important;
+  }
+
+  /* Elements drawer stays closed until the existing expand button sets false. */
+  .app-workspace > .panel-right {
+    right: auto;
+    left: 0;
+    border-left: 1px solid var(--border-color);
+    transform: translateX(-102%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  body[data-responsive-panel="elements"] .app-workspace > .panel-right:not(.collapsed) {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .app-workspace > .panel-right.collapsed {
+    width: min(330px, calc(100% - 64px)) !important;
+    transform: translateX(-102%);
+  }
+
+  .app-workspace > .resize-handle {
+    display: none !important;
+  }
+
+  .app-workspace > #expand-right-btn {
+    display: none !important;
+  }
+
+  .center-workspace,
+  .preview-canvas-container,
+  .preview-canvas-wrapper,
+  .bottom-panel,
+  .code-editor-section,
+  .dom-tree-section {
+    min-width: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Phone: full-width canvas with side drawers and a touch-friendly header/rail
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  :root {
+    --responsive-mobile-header-height: 140px;
+    --responsive-mobile-rail-size: 48px;
+    --responsive-mobile-gutter: 8px;
+  }
+
+  html,
+  body {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+  }
+
+  .app-container {
+    grid-template-rows: var(--responsive-mobile-header-height) minmax(0, 1fr);
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-width: 0;
+  }
+
+  header.app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px 44px 44px;
+    gap: 4px;
+    height: var(--responsive-mobile-header-height);
+    min-width: 0;
+    padding: 4px 8px;
+    overflow: hidden;
+  }
+
+  header.app-header .header-right {
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+    gap: 6px !important;
+    overflow: hidden;
+  }
+
+  header.app-header .project-title {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  header.app-header .project-title > div {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  header.app-header .project-title > span:last-child,
+  header.app-header .breadcrumb-badge,
+  header.app-header #header-active-file-label,
+  header.app-header .checkbox-container {
+    display: none !important;
+  }
+
+  header.app-header .header-left {
+    display: contents;
+  }
+
+  header.app-header .viewport-selector {
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+  }
+
+  header.app-header .viewport-btn {
+    width: 100%;
+    min-width: 44px;
+    height: 44px;
+    justify-content: center;
+    padding-inline: 4px;
+    font-size: 11px;
+  }
+
+  header.app-header .header-actions {
+    grid-row: 3;
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) transparent;
+  }
+
+  header.app-header :is(
+    #project-manager-btn,
+    #header-undo,
+    #header-redo,
+    #export-btn,
+    #final-preview-btn,
+    #preview-toggle-btn,
+    #beginner-mode-toggle
+  ) {
+    flex: 0 0 44px;
+    width: 44px !important;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 !important;
+    font-size: 0;
+  }
+
+  header.app-header :is(
+    #project-manager-btn,
+    #header-undo,
+    #header-redo,
+    #export-btn,
+    #final-preview-btn,
+    #preview-toggle-btn,
+    #beginner-mode-toggle
+  ) i {
+    font-size: 15px;
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav {
+    bottom: 8px;
+    width: calc(100% - 16px);
+    border-radius: var(--radius-lg);
+  }
+
+  body.responsive-shell-compact .responsive-panel-nav button {
+    flex-direction: column;
+    gap: 3px;
+    padding-inline: 4px;
+    font-size: 10px;
+  }
+
+  .app-workspace {
+    position: relative;
+    isolation: isolate;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-workspace > .center-workspace {
+    position: absolute;
+    inset: 0 0 72px;
+    z-index: 1;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .preview-canvas-container {
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .preview-header-bar {
+    height: 44px;
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+
+  .preview-header-right {
+    display: none;
+  }
+
+  .preview-canvas-wrapper {
+    min-width: 0;
+    padding-block: 12px;
+  }
+
+  .preview-canvas {
+    min-width: 0;
+    min-height: 360px;
+    padding: 16px;
+  }
+
+  .center-workspace.mode-designer {
+    --bottom-panel-height: 160px;
+  }
+
+  .bottom-panel,
+  .code-editor-section,
+  .dom-tree-section,
+  .code-editor-shell {
+    min-width: 0;
+  }
+
+  /* Keep the tool rail available without reserving canvas width. */
+  .app-workspace > .thin-sidebar {
+    position: absolute;
+    top: var(--responsive-mobile-gutter);
+    right: var(--responsive-mobile-gutter);
+    bottom: auto;
+    left: auto;
+    z-index: 50;
+    width: var(--responsive-mobile-rail-size);
+    max-height: calc(100% - 84px);
+    padding: 4px 0;
+    gap: 2px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-primary);
+    background: color-mix(in srgb, var(--bg-primary) 94%, transparent);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(8px);
+    transform: translateX(calc(100% + 16px));
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 180ms ease, opacity 180ms ease, visibility 180ms ease;
+  }
+
+  body[data-responsive-panel="properties"] .app-workspace > .thin-sidebar {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .app-workspace > .thin-sidebar .sidebar-icon-btn {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  /* Both side panels are true drawers layered above the full-width canvas. */
+  .app-workspace > .side-panel {
+    position: absolute;
+    top: 0;
+    bottom: 72px;
+    z-index: 40;
+    width: min(360px, calc(100% - 16px)) !important;
+    min-width: 0 !important;
+    max-width: calc(100% - 16px);
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    transition:
+      transform 180ms ease,
+      opacity 180ms ease,
+      visibility 180ms ease;
+    will-change: transform;
+  }
+
+  .app-workspace > .panel-left {
+    right: 56px;
+    left: auto;
+    width: min(360px, calc(100% - 64px)) !important;
+    max-width: calc(100% - 64px);
+    border-right: 1px solid var(--border-color);
+    transform: translateX(calc(100% + 64px));
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  body[data-responsive-panel="properties"] .app-workspace > .panel-left:not(.collapsed) {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .app-workspace > .panel-left.collapsed {
+    width: min(360px, calc(100% - 64px)) !important;
+  }
+
+  .app-workspace > .panel-right {
+    right: auto;
+    left: 0;
+    border-left: 1px solid var(--border-color);
+    transform: translateX(-102%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  body[data-responsive-panel="elements"] .app-workspace > .panel-right:not(.collapsed) {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .app-workspace > .panel-right.collapsed {
+    width: min(360px, calc(100% - 16px)) !important;
+    transform: translateX(-102%);
+  }
+
+  .app-workspace > .resize-handle {
+    display: none !important;
+  }
+
+  .app-workspace > #expand-right-btn {
+    display: none !important;
+  }
+
+  .side-panel .panel-header {
+    min-height: 52px;
+    gap: 8px;
+    padding-block: 4px;
+  }
+
+  .side-panel .panel-header > div {
+    min-width: 0;
+  }
+
+  .side-panel .panel-header > div > span:first-child {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .side-panel .panel-header > div > span:last-child {
+    display: none !important;
+  }
+
+  .side-panel .panel-toggle-btn {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Editor chrome gets reliable touch targets; canvas content stays untouched. */
+  .side-panel :is(button, input, select, textarea):not([type="hidden"]),
+  .bottom-panel :is(.editor-tab, button),
+  .project-drawer :is(button, input, select, textarea):not([type="hidden"]) {
+    min-height: 44px;
+  }
+
+  .side-panel .element-card {
+    min-height: 48px;
+  }
+
+  .side-panel :is(.box-margin, .page-dir-preview, .css-visual-control) {
+    max-width: 100%;
+  }
+
+  .floating-action-bubble {
+    max-width: calc(100vw - 24px);
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+  }
+
+  :is(
+    header.app-header,
+    .thin-sidebar,
+    .side-panel,
+    .bottom-panel,
+    #expand-right-btn
+  ) :is(button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent-orange);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 359.98px) {
+  header.app-header .viewport-btn {
+    font-size: 0;
+  }
+
+  header.app-header .viewport-btn i {
+    font-size: 15px;
+  }
+
+  .app-workspace > .panel-left {
+    right: 52px;
+    width: calc(100% - 56px) !important;
+    max-width: calc(100% - 56px);
+  }
+
+  .app-workspace > .panel-right {
+    width: calc(100% - 16px) !important;
+    max-width: calc(100% - 16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (max-width: 1199.98px) {
+  .app-workspace > .side-panel,
+  .app-workspace > .thin-sidebar,
+  .responsive-panel-nav,
+  .responsive-panel-backdrop {
+    transition: none;
+  }
+}

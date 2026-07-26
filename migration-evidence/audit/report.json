@@ -1,0 +1,123 @@
+{
+  "generatedAt": "2026-07-26T11:49:55.714Z",
+  "result": "pass",
+  "checks": {
+    "originalIdsPreserved": true,
+    "cssSourceCopiesExact": true,
+    "cssPublicCopiesExact": true,
+    "noDangerouslySetInnerHTML": true,
+    "noClassicRuntimeScripts": true,
+    "productionScriptsAreModules": true,
+    "runtimeOrderPreserved": true
+  },
+  "counts": {
+    "vanillaIds": 237,
+    "reactIds": 237,
+    "vanillaCssFiles": 17,
+    "productionScripts": 1,
+    "preApplicationModules": 3,
+    "postApplicationModules": 5
+  },
+  "missingIds": [],
+  "cssParity": [
+    {
+      "filename": "accessibility-polish.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "beginner-mode.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "components.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "css-inspector.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "dom-tree-clarity.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "dom-tree-enhancements.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "element-identity.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "interaction-demo.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "interaction-hub.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "layout.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "onboarding-tour.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "preview.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "project-manager.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "responsive-shell.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "selection-toolbar-responsive.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "variables.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    },
+    {
+      "filename": "visual-logic-phase-a.css",
+      "sourceCopyExact": true,
+      "publicCopyExact": true
+    }
+  ],
+  "dangerouslySetInnerHTMLMatches": [],
+  "legacyClassicScripts": [],
+  "productionScripts": [
+    {
+      "type": "module",
+      "crossorigin": "",
+      "src": "./assets/index-DmRkcjyq.js"
+    }
+  ],
+  "versions": {
+    "react": "^19.2.8",
+    "reactDom": "^19.2.8",
+    "vite": "^8.1.5"
+  }
+}

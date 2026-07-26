@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-07-26T04:16:07.830Z",
+  "targets": {
+    "vanilla": "http://127.0.0.1:5500/index.html",
+    "react": "http://127.0.0.1:4173/index.html"
+  },
+  "viewports": {
+    "desktop": {
+      "width": 1440,
+      "height": 1000
+    },
+    "tablet": {
+      "width": 1024,
+      "height": 768
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "comparisons": {
+    "desktop": {
+      "width": 1440,
+      "height": 1000,
+      "differentPixels": 0,
+      "differenceRatio": 0,
+      "geometryDifferences": {},
+      "diffPath": "D:\\1-a\\react-migration\\migration-evidence\\visual-comparison\\desktop-diff.png"
+    },
+    "tablet": {
+      "width": 1024,
+      "height": 768,
+      "differentPixels": 0,
+      "differenceRatio": 0,
+      "geometryDifferences": {},
+      "diffPath": "D:\\1-a\\react-migration\\migration-evidence\\visual-comparison\\tablet-diff.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "differentPixels": 0,
+      "differenceRatio": 0,
+      "geometryDifferences": {},
+      "diffPath": "D:\\1-a\\react-migration\\migration-evidence\\visual-comparison\\mobile-diff.png"
+    }
+  },
+  "runtimeErrors": {
+    "desktop:vanilla": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "desktop:react": [],
+    "tablet:vanilla": [],
+    "tablet:react": [],
+    "mobile:vanilla": [],
+    "mobile:react": []
+  }
+}

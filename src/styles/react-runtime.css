@@ -1,0 +1,13 @@
+/*
+ * Prevent the static shell from painting intermediate panel states while the
+ * feature chunks restore the saved workspace. The final DOM and layout remain
+ * identical to the Vanilla reference.
+ */
+html:not([data-react-migration-ready]) #root {
+  visibility: hidden;
+}
+
+html[data-react-migration-ready='error'] #root,
+html[data-react-migration-ready='true'] #root {
+  visibility: visible;
+}

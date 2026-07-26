@@ -1,0 +1,47 @@
+/* Editor-only aids for elements rendered inside the canvas.
+   Authored presentation comes exclusively from project CSS so the designer
+   matches final preview and export. */
+
+.preview-canvas *.selected-element {
+  outline: 2px solid var(--accent-orange) !important;
+}
+
+.preview-canvas *.hovered-canvas-element {
+  outline: 1px dashed var(--accent-blue) !important;
+}
+
+/* Empty containers remain visible as editor drop targets. */
+.preview-canvas div:empty,
+.preview-canvas section:empty,
+.preview-canvas article:empty,
+.preview-canvas main:empty,
+.preview-canvas header:empty,
+.preview-canvas footer:empty,
+.preview-canvas nav:empty,
+.preview-canvas aside:empty,
+.preview-canvas form:empty,
+.preview-canvas fieldset:empty,
+.preview-canvas figure:empty {
+  min-height: 50px;
+  border: 1px dashed rgba(0, 0, 0, 0.15) !important;
+  background-color: rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+.preview-canvas div:empty::before,
+.preview-canvas section:empty::before,
+.preview-canvas form:empty::before {
+  content: "حاوية فارغة - اسحب عنصرًا هنا";
+  font-size: 10px;
+  color: #9ca3af;
+  font-family: var(--font-main);
+  pointer-events: none;
+}
+
+.preview-canvas .drag-hover-container {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  border: 2px dashed var(--accent-blue) !important;
+}

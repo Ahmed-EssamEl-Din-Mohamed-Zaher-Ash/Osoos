@@ -1,0 +1,74 @@
+{
+  "desktop": {
+    "viewport": [
+      1440,
+      1000
+    ],
+    "beginnerDefault": true,
+    "modeValue": "beginner",
+    "fourReadyComponents": true,
+    "htmlCatalogueCollapsed": true,
+    "bottomHiddenInDesigner": true,
+    "responsiveNavHidden": true,
+    "noHorizontalOverflow": true
+  },
+  "component": {
+    "added": true,
+    "childCountIncreased": true,
+    "selected": true,
+    "historyRecorded": true,
+    "inlineStylesMigrated": true,
+    "generatedCssPresent": true,
+    "liveStatusUpdated": true
+  },
+  "interaction": {
+    "keyboardAdded": true,
+    "advanced": true,
+    "beginnerRestored": true
+  },
+  "tabletCanvas": {
+    "compact": true,
+    "canvasActive": true,
+    "centerWidth": 976,
+    "propertiesHidden": true,
+    "elementsHidden": true,
+    "navVisible": true,
+    "noHorizontalOverflow": true
+  },
+  "tabletElements": {
+    "state": "elements",
+    "panelVisible": true,
+    "panelInsideViewport": true,
+    "centerInert": true,
+    "panelInteractive": true,
+    "backdropVisible": true
+  },
+  "phoneCanvas": {
+    "viewport": [
+      390,
+      844
+    ],
+    "canvasActive": true,
+    "fullWidthCenter": true,
+    "noHorizontalOverflow": true,
+    "allHeaderActionsAvailable": true,
+    "headerTargetsAtLeast44": true,
+    "navTargetsAtLeast48": true,
+    "panelsHidden": true
+  },
+  "phoneElements": {
+    "visible": true,
+    "width": 360,
+    "insideViewport": true,
+    "readyComponentsVisible": true
+  },
+  "phoneProperties": {
+    "visible": true,
+    "width": 326,
+    "insideViewport": true,
+    "railVisible": true,
+    "centerInert": true
+  },
+  "backdropClosed": true,
+  "runtimeErrors": []
+}

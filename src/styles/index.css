@@ -1,0 +1,21 @@
+/*
+ * The original stylesheets are imported in their exact browser order.
+ * Their contents are copied byte-for-byte from the Vanilla application.
+ */
+@import './variables.css';
+@import './layout.css';
+@import './components.css';
+@import './css-inspector.css';
+@import './dom-tree-enhancements.css';
+@import './preview.css';
+@import './visual-logic-phase-a.css';
+@import './interaction-hub.css';
+@import './interaction-demo.css';
+@import './project-manager.css';
+@import './responsive-shell.css';
+@import './selection-toolbar-responsive.css';
+@import './onboarding-tour.css';
+@import './element-identity.css';
+@import './dom-tree-clarity.css';
+@import './accessibility-polish.css';
+@import './react-runtime.css';

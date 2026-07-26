@@ -1,0 +1,91 @@
+{
+  "targetUrl": "http://127.0.0.1:5500/index.html",
+  "setup": {
+    "selectedByCanvasClick": true,
+    "selectedHasContextKey": true,
+    "bubblePresent": true,
+    "customJSLength": 85,
+    "historyLength": 1
+  },
+  "opened": {
+    "overlayPresent": true,
+    "flow2bVisible": true,
+    "bubbleExpanded": true,
+    "selectedKeyBound": true,
+    "selectedLabelIsReal": true,
+    "triggerIdentityMatchesSelection": true,
+    "actionEditorsPresent": true,
+    "targetSelectsUseCanvasElements": true,
+    "dialogSemantics": true
+  },
+  "configuredCondition": {
+    "condition2aVisible": true,
+    "sourceIsActualEmail": true,
+    "operatorIsIncludes": true,
+    "compareValueIsAt": true,
+    "liveValueRead": true,
+    "actualConditionPasses": true,
+    "customJSUnchangedBeforeSave": true,
+    "historyUnchangedBeforeSave": true
+  },
+  "configuredActions": {
+    "returnedToFlow": true,
+    "insideTargetsStatus": true,
+    "insideValueUpdated": true,
+    "stillDirty": true
+  },
+  "saved": {
+    "triggerReceivedIdOnSave": true,
+    "customJSChangedOnSave": true,
+    "oneHistoryCommit": true,
+    "schema10Saved": true,
+    "selectedElementIsSource": true,
+    "conditionReadsEmail": true,
+    "insideActionTargetsStatus": true,
+    "savedDefinitionId": "osoos-demo-button-ot2wd",
+    "blockCount": 1,
+    "saveMessageIsProjectSave": true
+  },
+  "updatedWithoutDuplicate": {
+    "sameDefinitionUpdated": true,
+    "noDuplicateBlock": true,
+    "updateHistoryCommit": true,
+    "updatedValuePersisted": true
+  },
+  "run": {
+    "sawBusy": true,
+    "completed": true,
+    "triggerDone": true,
+    "gateDone": true,
+    "trueBranchDone": true,
+    "elseSkipped": true,
+    "statusExplainsResult": true
+  },
+  "closed": {
+    "overlayClosed": true,
+    "bubbleCollapsed": true,
+    "focusReturnedToBubble": true
+  },
+  "reopened": {
+    "escapeClosed": true,
+    "savedDefinitionRehydrated": true,
+    "updatedValueRehydrated": true,
+    "selectedElementStillControlsDemo": true
+  },
+  "mobileFlow": {
+    "mobileViewport": true,
+    "dialogUsesViewport": true,
+    "flowVisible": true,
+    "contextualControlsVisible": true,
+    "bodyNoHorizontalOverflow": true,
+    "boardNoHorizontalOverflow": true
+  },
+  "mobileCondition": {
+    "conditionVisible": true,
+    "actualPagePickerVisible": true,
+    "liveValueStatusVisible": true,
+    "bodyNoHorizontalOverflow": true,
+    "boardNoHorizontalOverflow": true
+  },
+  "runtimeErrors": []
+}
