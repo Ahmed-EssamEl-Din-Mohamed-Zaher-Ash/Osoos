@@ -493,6 +493,62 @@ class PropertiesManager {
     return value;
   }
 
+  normalizeFlexShorthand(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) return null;
+    const probe = document.createElement('div');
+    probe.style.flex = value;
+    if (!probe.style.flex) return null;
+    return {
+      flex: probe.style.flex,
+      grow: probe.style.flexGrow || '0',
+      shrink: probe.style.flexShrink || '1',
+      basis: probe.style.flexBasis || 'auto'
+    };
+  }
+
+  syncFlexEditorFields(parsed) {
+    if (!parsed) return;
+    this.setFieldValue('prop-flex-value', parsed.flex);
+    this.setFieldValue('prop-flex-grow', parsed.grow);
+    this.setFieldValue('prop-flex-shrink', parsed.shrink);
+    this.setFieldValue('prop-flex-basis', parsed.basis);
+    this.syncSegmentActive('flex-preset-segmented', parsed.flex);
+  }
+
+  applyFlexShorthand(rawValue, options = {}) {
+    if (!this.selectedElement) return false;
+    const parsed = this.normalizeFlexShorthand(rawValue);
+    const flexField = document.getElementById('prop-flex-value');
+    if (flexField) {
+      flexField.classList.toggle('css-value-invalid', !parsed);
+      flexField.setAttribute('aria-invalid', String(!parsed));
+    }
+    if (!parsed) return false;
+
+    // A single canonical shorthand prevents flex-grow/flex-shrink/flex-basis
+    // declarations from competing with an older flex declaration.
+    const applied = this.applyStyles({
+      'flex-grow': '',
+      'flex-shrink': '',
+      'flex-basis': '',
+      flex: parsed.flex
+    }, { delay: options.delay === undefined ? 90 : options.delay });
+    this.syncFlexEditorFields(parsed);
+    return applied;
+  }
+
+  applyFlexPartsFromEditor() {
+    const grow = document.getElementById('prop-flex-grow');
+    const shrink = document.getElementById('prop-flex-shrink');
+    const basis = document.getElementById('prop-flex-basis');
+    if (!grow || !shrink || !basis) return false;
+    const normalizedBasis = this.normalizeLengthValue(basis.value);
+    return this.applyFlexShorthand(
+      `${String(grow.value || '0').trim()} ${String(shrink.value || '1').trim()} ${normalizedBasis || 'auto'}`
+    );
+  }
+
   setActiveBreakpoint(breakpoint, options = {}) {
     const next = breakpoint === 'all' || this.app.styleEngine.breakpoints[breakpoint]
       ? breakpoint
@@ -705,7 +761,7 @@ class PropertiesManager {
     bindSegment('align-segmented', 'align-items');
     bindSegment('flex-wrap-segmented', 'flex-wrap');
     bindSegment('align-content-segmented', 'align-content');
-    bindSegment('flex-preset-segmented', 'flex');
+    bindSegment('flex-preset-segmented', '', value => this.applyFlexShorthand(value));
     bindSegment('align-self-segmented', 'align-self');
     bindSegment('box-sizing-segmented', 'box-sizing');
     bindSegment('position-segmented', 'position', val => this.updatePositionFieldsState(val));
@@ -1035,10 +1091,14 @@ class PropertiesManager {
     bindValueControl(document.getElementById('prop-column-gap'), 'column-gap', { length: true });
 
     // Flex item properties are written to the selected child itself.
-    bindValueControl(document.getElementById('prop-flex-value'), 'flex');
-    bindValueControl(document.getElementById('prop-flex-grow'), 'flex-grow');
-    bindValueControl(document.getElementById('prop-flex-shrink'), 'flex-shrink');
-    bindValueControl(document.getElementById('prop-flex-basis'), 'flex-basis', { length: true });
+    const flexValue = document.getElementById('prop-flex-value');
+    if (flexValue) {
+      flexValue.addEventListener('input', () => this.applyFlexShorthand(flexValue.value));
+    }
+    ['prop-flex-grow', 'prop-flex-shrink', 'prop-flex-basis'].forEach(id => {
+      const control = document.getElementById(id);
+      if (control) control.addEventListener('input', () => this.applyFlexPartsFromEditor());
+    });
     bindValueControl(document.getElementById('prop-flex-order'), 'order');
   }
 
@@ -1245,6 +1305,23 @@ class PropertiesManager {
         this.customFonts.push({ family: safeFamily, css: `'${safeFamily}', sans-serif`, label: `${safeFamily} (مخصص)`, custom: true });
       }
     });
+    const localMarkers = (this.app.editor.customCSS || '').match(/\/\* OSOOS_LOCAL_FONT: ([^*]+) \*\//g) || [];
+    localMarkers.forEach(marker => {
+      const payload = marker.replace('/* OSOOS_LOCAL_FONT:', '').replace('*/', '').trim();
+      try {
+        const metadata = JSON.parse(decodeURIComponent(payload));
+        const family = this.sanitizeFontFamilyName(metadata.family);
+        if (family && !this.customFonts.some(font => font.family === family)) {
+          this.customFonts.push({
+            family,
+            css: `'${family}'`,
+            label: `${family} (من الجهاز)`,
+            custom: true,
+            local: true
+          });
+        }
+      } catch { /* Ignore malformed metadata while leaving the user's CSS intact. */ }
+    });
   }
 
   /* الرابط يُكتب داخل تعليق CSS ووسم link: نمنع كسر التعليق وحقن سمات */
@@ -1297,6 +1374,89 @@ class PropertiesManager {
   /* عائلة الخط تدخل قاعدة CSS: نمنع كسر القاعدة أو التعليق */
   sanitizeFontFamilyName(value) {
     return String(value || '').replace(/[<>"'`;{}()\\]|\*\//g, '').trim().slice(0, 64);
+  }
+
+  getLocalFontFormat(file) {
+    const extension = String(file && file.name || '').split('.').pop().toLowerCase();
+    const formats = {
+      woff2: 'woff2',
+      woff: 'woff',
+      otf: 'opentype',
+      otc: 'opentype',
+      ttf: 'truetype',
+      ttc: 'truetype',
+      eot: 'embedded-opentype',
+      svg: 'svg',
+      dfont: 'truetype'
+    };
+    return formats[extension] || '';
+  }
+
+  readFontFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error || new Error('تعذر قراءة ملف الخط'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async validateLocalFont(family, sourceUrl) {
+    if (typeof FontFace !== 'function' || !document.fonts) return true;
+    const face = new FontFace(family, `url("${sourceUrl}")`);
+    await face.load();
+    document.fonts.add(face);
+    return true;
+  }
+
+  buildLocalFontCss(family, file, sourceUrl) {
+    const format = this.getLocalFontFormat(file);
+    const metadata = encodeURIComponent(JSON.stringify({
+      family,
+      fileName: String(file.name || 'font'),
+      format: format || 'auto'
+    }));
+    const formatClause = format ? ` format('${format}')` : '';
+    return `/* OSOOS_LOCAL_FONT: ${metadata} */\n@font-face {\n  font-family: '${family}';\n  src: url('${sourceUrl}')${formatClause};\n  font-style: normal;\n  font-weight: 100 900;\n  font-display: swap;\n}`;
+  }
+
+  async registerLocalFontFile(file, requestedFamily = '') {
+    if (!file) return false;
+    if (file.size > 50 * 1024 * 1024) {
+      throw new Error('حجم ملف الخط أكبر من 50MB');
+    }
+    const family = this.sanitizeFontFamilyName(
+      requestedFamily || file.name.replace(/\.[^.]+$/, '')
+    ) || 'CustomFont';
+    const sourceUrl = await this.readFontFileAsDataUrl(file);
+    await this.validateLocalFont(family, sourceUrl);
+    const fontFace = this.buildLocalFontCss(family, file, sourceUrl);
+
+    if (this.app.editor) {
+      this.app.editor.customCSS = `${fontFace}\n${this.app.editor.customCSS || ''}`;
+    }
+    const styleTag = document.createElement('style');
+    styleTag.setAttribute('data-osoos-font', 'true');
+    styleTag.setAttribute('data-osoos-local-font', family);
+    styleTag.textContent = fontFace;
+    document.head.appendChild(styleTag);
+
+    if (!this.customFonts.some(font => font.family === family)) {
+      this.customFonts.push({
+        family,
+        css: `'${family}'`,
+        label: `${family} (من الجهاز)`,
+        custom: true,
+        local: true
+      });
+    }
+    if (this.selectedElement) this.applyStyle('font-family', `'${family}'`);
+    const pickerButton = document.getElementById('font-picker-btn');
+    if (pickerButton) {
+      pickerButton.innerHTML = `${this.escapeFontHtml(family)} (من الجهاز) <i class="fas fa-chevron-down" style="font-size: 8px; opacity: .6;"></i>`;
+    }
+    if (this.app.scheduleStyleSync) this.app.scheduleStyleSync(0);
+    return { family, format: this.getLocalFontFormat(file) || 'auto' };
   }
 
   buildFontListHtml() {
@@ -1369,31 +1529,27 @@ class PropertiesManager {
       if (this.app.scheduleStyleSync) this.app.scheduleStyleSync(50);
       this.notifyFonts(`تمت إضافة الخط ${safeFamily} — رابطه سيُحقن تلقائياً في head عند التصدير`);
     });
-    /* خط مخصص برفع ملف → @font-face داخل CSS المشروع */
+    /* خط مخصص من الجهاز → اختبار الصيغة ثم @font-face داخل CSS المشروع */
     const uploadButton = document.getElementById('upload-font-btn');
     const fileInput = document.getElementById('custom-font-file');
     if (uploadButton && fileInput) {
       uploadButton.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', () => {
+      fileInput.addEventListener('change', async () => {
         const file = fileInput.files && fileInput.files[0];
         if (!file) return;
-        const family = this.sanitizeFontFamilyName(((document.getElementById('custom-font-family') || {}).value || '').trim() || file.name.replace(/\.[^.]+$/, '')) || 'CustomFont';
-        const reader = new FileReader();
-        reader.onload = () => {
-          const format = /\.woff2$/i.test(file.name) ? 'woff2' : (/\.woff$/i.test(file.name) ? 'woff' : (/\.otf$/i.test(file.name) ? 'opentype' : 'truetype'));
-          const fontFace = `@font-face {\n  font-family: '${family}';\n  src: url('${reader.result}') format('${format}');\n  font-display: swap;\n}`;
-          if (this.app.editor) this.app.editor.customCSS = `${fontFace}\n${this.app.editor.customCSS || ''}`;
-          const styleTag = document.createElement('style');
-          styleTag.setAttribute('data-osoos-font', 'true');
-          styleTag.textContent = fontFace;
-          document.head.appendChild(styleTag);
-          if (!this.customFonts.some(font => font.family === family)) {
-            this.customFonts.push({ family, css: `'${family}'`, label: `${family} (مرفوع)`, custom: true });
-          }
-          if (this.app.scheduleStyleSync) this.app.scheduleStyleSync(50);
-          this.notifyFonts(`تم تحويل الملف إلى @font-face وأصبح خط ${family} متاحاً في القائمة`);
-        };
-        reader.readAsDataURL(file);
+        const requestedFamily = ((document.getElementById('custom-font-family') || {}).value || '').trim();
+        uploadButton.disabled = true;
+        uploadButton.setAttribute('aria-busy', 'true');
+        try {
+          const registered = await this.registerLocalFontFile(file, requestedFamily);
+          this.notifyFonts(`تمت إضافة خط ${registered.family} من جهازك وحفظه مع المشروع`);
+        } catch (error) {
+          console.warn('تعذر تحميل ملف الخط.', error);
+          this.notifyFonts(`تعذر استخدام هذا الملف كخط في المتصفح: ${error.message || 'صيغة غير مدعومة'}`);
+        } finally {
+          uploadButton.disabled = false;
+          uploadButton.removeAttribute('aria-busy');
+        }
         fileInput.value = '';
       });
     }
@@ -1880,6 +2036,7 @@ class PropertiesManager {
 
     // 3. Link Editor Listeners
     const linkText = document.getElementById('prop-link-text');
+    const linkUnderline = document.getElementById('prop-link-underline');
     const linkHref = document.getElementById('prop-link-href');
     const linkTarget = document.getElementById('prop-link-target');
     const linkRel = document.getElementById('prop-link-rel');
@@ -1889,6 +2046,13 @@ class PropertiesManager {
     const linkTest = document.getElementById('prop-link-test');
 
     if (linkText) linkText.addEventListener('input', () => this.applyLivePreview());
+    if (linkUnderline) {
+      linkUnderline.addEventListener('change', () => {
+        if (this.selectedElement && this.selectedElement.tagName.toLowerCase() === 'a') {
+          this.applyStyle('text-decoration-line', linkUnderline.value, { delay: 60 });
+        }
+      });
+    }
     if (linkHref) linkHref.addEventListener('input', () => this.applyLivePreview());
     if (linkRel) linkRel.addEventListener('input', () => this.applyLivePreview());
 
@@ -1989,10 +2153,12 @@ class PropertiesManager {
 
     if (tag === 'a') {
       this.lnkBackup = {
+        innerHTML: element.innerHTML || '',
         textContent: element.textContent || '',
         href: element.getAttribute('href') || '',
         target: element.getAttribute('target') || '',
-        rel: element.getAttribute('rel') || ''
+        rel: element.getAttribute('rel') || '',
+        textDecorationLine: this.getStyleValue('text-decoration-line', '')
       };
     } else {
       this.lnkBackup = null;
@@ -2055,6 +2221,7 @@ class PropertiesManager {
     // 3. Link fields
     if (tag === 'a') {
       const linkText = document.getElementById('prop-link-text');
+      const linkUnderline = document.getElementById('prop-link-underline');
       const linkHref = document.getElementById('prop-link-href');
       const linkTarget = document.getElementById('prop-link-target');
       const linkRel = document.getElementById('prop-link-rel');
@@ -2066,6 +2233,13 @@ class PropertiesManager {
       const rel = element.getAttribute('rel') || '';
 
       if (linkText) linkText.value = textVal;
+      if (linkUnderline) {
+        const decoration = this.getStyleValue('text-decoration-line', '') ||
+          window.getComputedStyle(element).textDecorationLine ||
+          window.getComputedStyle(element).textDecoration ||
+          '';
+        linkUnderline.value = /\bunderline\b/i.test(decoration) ? 'underline' : 'none';
+      }
       if (linkHref) linkHref.value = href;
       if (linkTarget) linkTarget.value = target;
       if (linkRel) linkRel.value = rel;
@@ -2189,7 +2363,8 @@ class PropertiesManager {
     }
 
     if (tag === 'a' && this.lnkBackup) {
-      this.selectedElement.textContent = this.lnkBackup.textContent;
+      this.selectedElement.innerHTML = this.lnkBackup.innerHTML;
+      this.applyStyle('text-decoration-line', this.lnkBackup.textDecorationLine || '', { delay: 0 });
       if (this.lnkBackup.href) {
         this.selectedElement.setAttribute('href', this.lnkBackup.href);
       } else {

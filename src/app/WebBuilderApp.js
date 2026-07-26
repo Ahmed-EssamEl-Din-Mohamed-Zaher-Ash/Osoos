@@ -79,7 +79,7 @@ class WebBuilderApp {
     // Initialize the multi-file layer last. This lets it migrate the fully
     // normalized legacy page and makes the saved active file the final view.
     this.projectManager = new ProjectManager(this);
-    this.projectManager.init();
+    this.projectManager.readyPromise = this.projectManager.init();
   }
 
   // Populate HTML elements on the right panel
@@ -247,6 +247,9 @@ class WebBuilderApp {
       
       const target = e.target.closest('#builder-canvas *');
       if (target && target !== this.canvas) {
+        // Links are editable objects in designer mode. Never let selecting one
+        // navigate away from the workspace or change the current URL hash.
+        if (target.closest('a')) e.preventDefault();
         if (this.editor && this.editor.isPickingTarget) {
           e.preventDefault();
           this.editor.handleTargetPicked(target);
@@ -1079,10 +1082,13 @@ class WebBuilderApp {
     }, delay);
   }
 
-  syncDOMTree() {
+  syncDOMTree(options = {}) {
     if (this.styleEngine) this.styleEngine.migrateInlineStyles(this.canvas);
     this.domTree.render();
-    this.editor.refreshEditorContent();
+    this.editor.refreshEditorContent({
+      preserveSelection: options.preserveEditorSelection === true,
+      selectionState: options.editorSelectionState || null
+    });
     this.saveProgress();
   }
 
@@ -1298,6 +1304,33 @@ class WebBuilderApp {
       )],
       ['builder-page-settings', JSON.stringify(this.getPageSettings())]
     ];
+    const projectSave = this.projectManager && !this.projectManager.isSwitching
+      ? this.projectManager.saveFromEditor()
+      : null;
+    const localSnapshotSize = entries.reduce(
+      (total, [key, value]) => total + key.length + String(value || '').length,
+      0
+    );
+    const containsEmbeddedAsset = entries.some(([, value]) =>
+      /data:[^,]+;base64,/i.test(String(value || ''))
+    );
+    const useExpandedStorageOnly = !!projectSave &&
+      (containsEmbeddedAsset || localSnapshotSize > 1_500_000);
+
+    if (useExpandedStorageOnly) {
+      void Promise.resolve(projectSave).then(result => {
+        if (!result || !result.saved) return;
+        entries.forEach(([key]) => {
+          try { localStorage.removeItem(key); } catch { /* IndexedDB remains authoritative. */ }
+        });
+        if (!this._expandedStorageNotified) {
+          this._expandedStorageNotified = true;
+          this.showToastNotice('تم حفظ المشروع وملفاته الكبيرة في تخزين المتصفح الموسّع');
+          setTimeout(() => { this._expandedStorageNotified = false; }, 30000);
+        }
+      });
+      return;
+    }
     let previousValues = null;
 
     try {
@@ -1318,16 +1351,30 @@ class WebBuilderApp {
         }
       }
       console.warn('تعذر حفظ تقدم المشروع محليًا.', error);
-      /* فشل الحفظ (امتلاء الحصة غالباً) كان صامتاً تماماً — المستخدم يفقد شغله بلا إنذار */
-      if (typeof this.showToastNotice === 'function' && !this._saveFailureNotified) {
+      if (projectSave) {
+        void Promise.resolve(projectSave).then(result => {
+          if (result && result.saved) {
+            entries.forEach(([key]) => {
+              try { localStorage.removeItem(key); } catch { /* IndexedDB remains authoritative. */ }
+            });
+            if (!this._expandedStorageNotified) {
+              this._expandedStorageNotified = true;
+              this.showToastNotice('تم الحفظ في تخزين المتصفح الموسّع بعد امتلاء الذاكرة الصغيرة');
+              setTimeout(() => { this._expandedStorageNotified = false; }, 30000);
+            }
+            return;
+          }
+          if (!this._saveFailureNotified) {
+            this._saveFailureNotified = true;
+            this.showToastNotice('تعذّر الحفظ المحلي. احفظ المشروع في مجلد أو صدّره الآن');
+            setTimeout(() => { this._saveFailureNotified = false; }, 30000);
+          }
+        });
+      } else if (typeof this.showToastNotice === 'function' && !this._saveFailureNotified) {
         this._saveFailureNotified = true;
-        this.showToastNotice('تعذّر الحفظ التلقائي — المساحة المحلية ممتلئة. صدّر مشروعك الآن للاحتفاظ به');
+        this.showToastNotice('تعذّر الحفظ المحلي. احفظ المشروع في مجلد أو صدّره الآن');
         setTimeout(() => { this._saveFailureNotified = false; }, 30000);
       }
-    }
-
-    if (this.projectManager && !this.projectManager.isSwitching) {
-      this.projectManager.saveFromEditor();
     }
 
   }

@@ -11,6 +11,9 @@ class ProjectManager {
     this.activeExternalFileId = null;
     this.directoryHandles = new Map();
     this.fileHandles = new Map();
+    this.ready = false;
+    this.storageBackend = 'none';
+    this._persistQueue = Promise.resolve();
     this.maxImportedFiles = 400;
     this.supportedTextExtensions = new Set([
       'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'json', 'txt', 'md', 'xml',
@@ -22,7 +25,7 @@ class ProjectManager {
     ]);
   }
 
-  init() {
+  async init() {
     this.injectInterface();
     this.bindInterface();
     this.ensureLinkedStyleTag();
@@ -37,7 +40,7 @@ class ProjectManager {
       settings: Object.assign({}, this.app.getPageSettings())
     });
 
-    this.workspace = this.loadWorkspace();
+    this.workspace = await this.loadWorkspace();
     if (!this.workspace || !Array.isArray(this.workspace.projects) || this.workspace.projects.length === 0) {
       const project = this.createProject('مشروعي الأول', [legacyPage]);
       this.workspace = { version: 1, activeProjectId: project.id, projects: [project] };
@@ -45,21 +48,27 @@ class ProjectManager {
 
     this.repairWorkspace();
     this.activateProject(this.workspace.activeProjectId, { initial: true });
-    this.persistWorkspace();
+    await this.persistWorkspace();
+    this.ready = true;
 
     window.addEventListener('beforeunload', () => {
       this.captureWorkspaceState();
-      this.persistWorkspace();
+      void this.persistWorkspace();
     });
 
     document.addEventListener('keydown', event => {
       if (!(event.ctrlKey || event.metaKey) || String(event.key).toLowerCase() !== 's') return;
       event.preventDefault();
       this.captureWorkspaceState();
-      this.persistWorkspace();
       const handle = this.directoryHandles.get(this.project.id);
       if (handle) this.saveProjectToFolder();
-      else this.notice('تم حفظ المشروع محليًا — استخدم «حفظ في مجلد» لكتابته على جهازك');
+      else {
+        void this.persistWorkspace().then(result => {
+          if (result.saved) {
+            this.notice('تم حفظ المشروع محليًا في تخزين المتصفح الموسّع — استخدم «حفظ في مجلد» لكتابته على جهازك');
+          }
+        });
+      }
     });
   }
 
@@ -192,10 +201,11 @@ class ProjectManager {
     }
   }
 
-  loadWorkspace() {
+  async loadWorkspace() {
     const storageService = window.OsoosReactServices && window.OsoosReactServices.storage;
-    if (storageService && typeof storageService.readWorkspace === 'function') {
-      const result = storageService.readWorkspace(this.storageKey);
+    if (storageService && typeof storageService.readWorkspaceAsync === 'function') {
+      const result = await storageService.readWorkspaceAsync(this.storageKey);
+      this.storageBackend = result.backend || 'none';
       if (!result.corrupt) return result.workspace;
 
       console.warn('تعذر تحميل مساحة المشاريع.', result.error);
@@ -207,6 +217,12 @@ class ProjectManager {
         9000
       );
       return null;
+    }
+
+    if (storageService && typeof storageService.readWorkspace === 'function') {
+      const result = storageService.readWorkspace(this.storageKey);
+      this.storageBackend = result.workspace ? 'localstorage' : 'none';
+      if (!result.corrupt) return result.workspace;
     }
 
     let raw = null;
@@ -235,37 +251,58 @@ class ProjectManager {
   }
 
   persistWorkspace() {
-    if (!this.workspace) return;
+    if (!this.workspace) return Promise.resolve({ saved: false, backend: 'none' });
     if (this._workspaceStorageLocked) {
       if (!this._corruptStorageNoticeShown) {
         this._corruptStorageNoticeShown = true;
         this.notice('الحفظ المحلي متوقف لحماية ملف المشاريع التالف من الكتابة فوقه.', 9000);
       }
-      return;
+      return Promise.resolve({ saved: false, backend: 'none', locked: true });
     }
-    try {
-      if (this.project) this.project.updatedAt = Date.now();
-      const storageService = window.OsoosReactServices && window.OsoosReactServices.storage;
-      if (storageService && typeof storageService.writeWorkspace === 'function') {
-        storageService.writeWorkspace(this.workspace, this.storageKey);
+    if (this.project) this.project.updatedAt = Date.now();
+    const snapshot = structuredClone(this.workspace);
+    const storageService = window.OsoosReactServices && window.OsoosReactServices.storage;
+
+    const saveOperation = async () => {
+      let result;
+      if (storageService && typeof storageService.writeWorkspaceAsync === 'function') {
+        result = await storageService.writeWorkspaceAsync(snapshot, this.storageKey);
       } else {
-        localStorage.setItem(this.storageKey, JSON.stringify(this.workspace));
+        try {
+          localStorage.setItem(this.storageKey, JSON.stringify(snapshot));
+          result = { saved: true, backend: 'localstorage', error: null };
+        } catch (error) {
+          result = { saved: false, backend: 'none', error };
+        }
       }
-    } catch (error) {
-      console.warn('تعذر حفظ مساحة المشاريع.', error);
+
+      if (result.saved) {
+        this.storageBackend = result.backend;
+        this._storageFailureNotified = false;
+        return result;
+      }
+
+      console.warn('تعذر حفظ مساحة المشاريع.', result.error);
       if (!this._storageFailureNotified) {
         this._storageFailureNotified = true;
-        this.notice('تعذر حفظ كل ملفات المشروع محليًا؛ قد تكون الملفات كبيرة. احفظ المشروع في مجلد أو صدّره الآن', 7000);
+        this.notice('تعذر حفظ ملفات المشروع محليًا. احفظ المشروع في مجلد أو صدّره الآن', 7000);
         setTimeout(() => { this._storageFailureNotified = false; }, 30000);
       }
-    }
+      return result;
+    };
+
+    this._persistQueue = this._persistQueue
+      .catch(() => ({ saved: false }))
+      .then(saveOperation);
+    return this._persistQueue;
   }
 
   saveFromEditor() {
-    if (this.isSwitching || !this.project) return;
+    if (this.isSwitching || !this.project) return Promise.resolve({ saved: false });
     this.captureWorkspaceState();
-    this.persistWorkspace();
+    const saved = this.persistWorkspace();
     this.render();
+    return saved;
   }
 
   captureWorkspaceState() {
@@ -607,7 +644,11 @@ class ProjectManager {
     if (activeHeaderFile) activeHeaderFile.textContent = activeFile ? `- ${activeFile.path}` : '';
     const location = document.getElementById('project-location-label');
     const directoryHandle = this.directoryHandles.get(this.project.id);
-    location.textContent = directoryHandle ? directoryHandle.name : 'ذاكرة المتصفح المحلية';
+    location.textContent = directoryHandle
+      ? directoryHandle.name
+      : (this.storageBackend === 'indexeddb'
+        ? 'تخزين المتصفح الموسّع'
+        : 'ذاكرة المتصفح المحلية');
 
     const list = document.getElementById('project-files-list');
     list.replaceChildren();

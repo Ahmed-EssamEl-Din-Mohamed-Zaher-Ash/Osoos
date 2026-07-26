@@ -344,6 +344,27 @@ export function InspectorPanel() {
               {"\n              "}
               <div className={"css-prop-row"} style={{"display":"flex","alignItems":"center","justifyContent":"space-between","marginBottom":"8px","gap":"8px"}}>
                 {"\n                "}
+                <span className={"css-prop-label"} data-css-property={"text-decoration-line"} style={{"fontSize":"11px","color":"var(--text-muted)","flex":"1"}}>
+                  {"الخط السفلي"}
+                </span>
+                {"\n                "}
+                <select id={"prop-link-underline"} className={"css-prop-field"} data-css-property={"text-decoration-line"} style={{"width":"130px","height":"26px","padding":"0 8px","fontSize":"11px"}}>
+                  {"\n                  "}
+                  <option value={"underline"}>
+                    {"إظهار الخط السفلي"}
+                  </option>
+                  {"\n                  "}
+                  <option value={"none"}>
+                    {"إخفاء الخط السفلي"}
+                  </option>
+                  {"\n                "}
+                </select>
+                {"\n              "}
+              </div>
+              {"\n\n              "}
+              {"\n              "}
+              <div className={"css-prop-row"} style={{"display":"flex","alignItems":"center","justifyContent":"space-between","marginBottom":"8px","gap":"8px"}}>
+                {"\n                "}
                 <span className={"css-prop-label"} style={{"fontSize":"11px","color":"var(--text-muted)","flex":"1"}}>
                   {"نوع الرابط"}
                 </span>
@@ -746,7 +767,7 @@ export function InspectorPanel() {
                   {"\n                "}
                 </div>
                 {"\n                "}
-                <label className={"css-inline-field"}>
+                <label className={"css-inline-field flex-shorthand-field"}>
                   <span>
                     {"flex"}
                   </span>
@@ -780,7 +801,7 @@ export function InspectorPanel() {
                 {"\n                "}
                 <div className={"css-prop-row"}>
                   {"\n                  "}
-                  <label className={"css-inline-field"}>
+                  <label className={"css-inline-field flex-order-field"}>
                     <span>
                       {"order"}
                     </span>
@@ -1507,21 +1528,21 @@ export function InspectorPanel() {
                   {"\n                  "}
                   <button type={"button"} className={"btn btn-outline"} id={"upload-font-btn"}>
                     <i className={"fas fa-upload"}></i>
-                    {" رفع ملف خط"}
+                    {" اختيار خط من الجهاز"}
                   </button>
                   {"\n                  "}
-                  <input type={"file"} id={"custom-font-file"} accept={".woff2,.woff,.ttf,.otf"} hidden />
+                  <input type={"file"} id={"custom-font-file"} accept={"*/*"} hidden />
                   {"\n                "}
                 </div>
                 {"\n                "}
                 <div className={"css-scope-guide neutral-guide"}>
                   <i className={"fas fa-circle-info"}></i>
                   <span>
-                    {"الرابط يُحقن تلقائياً في <head> عند التصدير، وملف الخط يتحول إلى "}
+                    {"يمكن اختيار أي ملف خط؛ سيختبر المتصفح الصيغة أولاً. الصيغ الشائعة WOFF2 وWOFF وTTF وOTF وEOT وTTC. يُضمّن الملف داخل "}
                     <code>
                       {"@font-face"}
                     </code>
-                    {" داخل CSS المشروع."}
+                    {" ويُحفظ مع المشروع."}
                   </span>
                 </div>
                 {"\n              "}
