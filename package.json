@@ -16,6 +16,7 @@
     "test:e2e": "npm run build && playwright test",
     "audit:migration": "node scripts/audit-migration.mjs",
     "compare:visual": "node scripts/compare-visuals.mjs",
+    "verify:ci": "npm run lint && npm run test:run && npm run build",
     "verify": "npm run lint && npm run test:run && npm run build && npm run audit:migration"
   },
   "dependencies": {

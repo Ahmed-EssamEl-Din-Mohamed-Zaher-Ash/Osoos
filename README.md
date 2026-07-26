@@ -44,6 +44,7 @@ npm run dev -- --port 5173
 | `npm run test:run` | تشغيل اختبارات Vitest مرة واحدة |
 | `npm run test:e2e` | البناء ثم تشغيل Playwright |
 | `npm run audit:migration` | تدقيق IDs وCSS والوحدات وغياب `dangerouslySetInnerHTML` |
+| `npm run verify:ci` | lint + unit tests + build من دون الاعتماد على ملفات Vanilla في المجلد الأب |
 | `npm run verify` | lint + unit tests + build + migration audit |
 | `npm run compare:visual` | مقارنة Vanilla وReact بصريًا بعد تشغيل الخادمين المطلوبين |
 
